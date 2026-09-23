@@ -1593,70 +1593,51 @@ function fitText(text, maxW, maxPt, minPt, bold, measure) {
 // ONE layout used by both the preview and the PDF, so they match.
 // measure(text, pt, bold) returns the text width in mm.
 // Returns { divider: y, items: [{ text, x, y, pt, bold, align }] } — y is the vertical centre.
-// Split a name into two lines at the space/hyphen that gives the most even halves.
-function splitTwoLines(text, measure, pt) {
-  var best = null;
-  for (var i = 1; i < text.length; i++) {
-    var a, b;
-    if (text[i] === ' ') { a = text.slice(0, i); b = text.slice(i + 1); }
-    else if (text[i - 1] === '-') { a = text.slice(0, i); b = text.slice(i); }
-    else continue;
-    var w = Math.max(measure(a, pt, true), measure(b, pt, true));
-    if (!best || w < best.w) best = { lines: [a.trim(), b.trim()], w: w };
+// Text printed before the size on every label, e.g. "Mary Jane Flat MAC 40".
+// Change it here if it ever needs to be different.
+var MKT_SIZE_PREFIX = 'MAC';
+
+// Shoe line: "<Shoe name> MAC <size>". If it is too long, only the SHOE NAME is
+// shortened with "..." — "MAC 40" is never cut off.
+function fitShoeLine(name, size, maxW, maxPt, minPt, measure) {
+  var tail = ' ' + MKT_SIZE_PREFIX + (size ? ' ' + size : '');
+  var full = (name || '-') + tail;
+  for (var pt = maxPt; pt >= minPt; pt -= 0.5) {
+    if (measure(full, pt, true) <= maxW) return { text: full, pt: pt };
   }
-  return best ? best.lines : null;
+  var n = name || '-';
+  while (n.length > 1 && measure(n.trim() + '...' + tail, minPt, true) > maxW) n = n.slice(0, -1);
+  return { text: n.trim() + '...' + tail, pt: minPt };
 }
 
-// PIC gets the biggest text. Long names wrap to 2 lines instead of shrinking to nothing.
-function fitPic(text, maxW, bandH, measure) {
-  var CAP = 0.72;                                    // capital letter height, in em
-  var maxPt1 = Math.min(40, (bandH - 3) / PT_MM / CAP);
-  var one = fitText(text, maxW, maxPt1, 9, true, measure);
-  if (one.pt >= 16) return { lines: [one.text], pt: one.pt };
-
-  var lines = splitTwoLines(text, measure, 12);
-  if (!lines) return { lines: [one.text], pt: one.pt };
-  var maxPt2 = Math.min(40, (bandH - 3) / 2 / PT_MM / 0.95);
-  for (var pt = maxPt2; pt >= 9; pt -= 0.5) {
-    if (measure(lines[0], pt, true) <= maxW && measure(lines[1], pt, true) <= maxW) {
-      return pt > one.pt ? { lines: lines, pt: pt } : { lines: [one.text], pt: one.pt };
-    }
-  }
-  return { lines: [one.text], pt: one.pt };
-}
-
+// Standard photoshoot label (approved sample):
+//   [black bar]  JARED
+//   Mary Jane Flat MAC 40   <- bold, biggest line
+//   Espresso                <- smaller
+//   LS-MJ-040               <- smaller
+// Every line sits at a FIXED position with a FIXED size, so all labels match.
+// Text only shrinks when a value is too long. Designed on 50x30mm; other sizes scale.
 function mktLayout(r, W, H, measure) {
-  var PAD = 2.5;                                     // keep text off the edge; thermal printers can clip
+  var PAD = 2.5;                                  // keep text off the edge; thermal printers can clip
   var maxW = W - 2 * PAD;
+  var k = Math.min(W / 50, H / 30);               // text scale
+  var ky = Math.min(H / 30, 1);                   // line positions: same on 30mm-tall labels; taller labels keep spare space at the bottom
   var items = [];
 
-  // PIC band: top ~38% of the label, biggest text.
-  var picH = H * 0.38;
-  var pic = fitPic(r.pic ? r.pic.toUpperCase() : NO_PIC.toUpperCase(), maxW, picH, measure);
-  var lineGap = pic.pt * PT_MM * 0.95;
-  var firstY = picH / 2 - (pic.lines.length - 1) * lineGap / 2;
-  pic.lines.forEach(function(t, i) {
-    items.push({ text: t, x: W / 2, y: firstY + i * lineGap, pt: pic.pt, bold: true, align: 'center' });
-  });
+  var bandH = 8.5 * k;
+  var pic = fitText(r.pic ? r.pic.toUpperCase() : NO_PIC.toUpperCase(), maxW, 14 * k, 8 * k, true, measure);
+  items.push({ text: pic.text, x: PAD, y: bandH / 2, pt: pic.pt, bold: true, align: 'left', color: 'white' });
 
-  // Details below the divider: product (a bit bigger) + 3 lines.
-  var top = picH + 1.2, bottom = H - PAD * 0.8;
-  var unit = (bottom - top) / 4.3;               // product line = 1.3 units, others 1 unit
-  var productPt = Math.min(14, unit * 1.3 / PT_MM / 1.2);
-  var detailPt = Math.min(11, unit / PT_MM / 1.25);
+  var shoe = fitShoeLine(r.product, r.size, maxW, 13 * k, 8 * k, measure);
+  items.push({ text: shoe.text, x: PAD, y: 13.8 * ky, pt: shoe.pt, bold: true, align: 'left' });
 
-  var prod = fitText(r.product || '-', maxW, productPt, 6, true, measure);
-  var y = top + unit * 1.3 / 2;
-  items.push({ text: prod.text, x: PAD, y: y, pt: prod.pt, bold: true, align: 'left' });
-  y += unit * 1.3 / 2;
+  var colour = fitText(r.colour || '-', maxW, 9 * k, 6.5 * k, false, measure);
+  items.push({ text: colour.text, x: PAD, y: 19.8 * ky, pt: colour.pt, bold: false, align: 'left' });
 
-  [['Size: ', r.size], ['Colour: ', r.colour], ['SKU/Lifestyle: ', r.sku]].forEach(function(line) {
-    var f = fitText(line[0] + (line[1] || '-'), maxW, detailPt, 5.5, false, measure);
-    items.push({ text: f.text, x: PAD, y: y + unit / 2, pt: f.pt, bold: false, align: 'left' });
-    y += unit;
-  });
+  var sku = fitText(r.sku || '-', maxW, 9 * k, 6.5 * k, false, measure);
+  items.push({ text: sku.text, x: PAD, y: 24.4 * ky, pt: sku.pt, bold: false, align: 'left' });
 
-  return { divider: picH, items: items };
+  return { band: { x: 0, y: 0, w: W, h: bandH }, items: items };
 }
 
 // Items store the visual centre of the capital letters. Browser canvas and jsPDF
@@ -1698,14 +1679,13 @@ function drawMarketingPreview() {
   function font(pt, bold) { return (bold ? 'bold ' : '') + (pt * PT_MM) + 'px Helvetica, Arial, sans-serif'; }
   var L = mktLayout(r, W, H, function(t, pt, bold) { ctx.font = font(pt, bold); return ctx.measureText(t).width; });
 
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 0.3;
-  ctx.beginPath(); ctx.moveTo(2.5, L.divider); ctx.lineTo(W - 2.5, L.divider); ctx.stroke();
-
   ctx.fillStyle = '#000';
+  ctx.fillRect(L.band.x, L.band.y, L.band.w, L.band.h);
+
   ctx.textBaseline = 'alphabetic';
   L.items.forEach(function(it) {
     ctx.font = font(it.pt, it.bold);
+    ctx.fillStyle = it.color === 'white' ? '#fff' : '#000';
     ctx.textAlign = it.align;
     ctx.fillText(it.text, it.x, baselineY(it));
   });
@@ -1739,12 +1719,12 @@ async function generateMarketingLabels() {
     for (var i = 0; i < rows.length; i++) {
       if (i > 0) doc.addPage([W, H], orient);
       var L = mktLayout(rows[i], W, H, measure);
-      doc.setDrawColor(0);
-      doc.setLineWidth(0.3);
-      doc.line(2.5, L.divider, W - 2.5, L.divider);
+      doc.setFillColor(0, 0, 0);
+      doc.rect(L.band.x, L.band.y, L.band.w, L.band.h, 'F');
       L.items.forEach(function(it) {
         doc.setFont('helvetica', it.bold ? 'bold' : 'normal');
         doc.setFontSize(it.pt);
+        if (it.color === 'white') doc.setTextColor(255, 255, 255); else doc.setTextColor(0, 0, 0);
         doc.text(it.text, it.x, baselineY(it), { align: it.align });
       });
       progressBar.style.width = ((i + 1) / rows.length * 100) + '%';
