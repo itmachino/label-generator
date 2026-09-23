@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Label Generator</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='8' y='4' width='48' height='56' rx='4' fill='%23fff' stroke='%23222' stroke-width='3'/><rect x='16' y='14' width='4' height='30' fill='%23222'/><rect x='22' y='14' width='2' height='30' fill='%23222'/><rect x='26' y='14' width='4' height='30' fill='%23222'/><rect x='32' y='14' width='2' height='30' fill='%23222'/><rect x='36' y='14' width='3' height='30' fill='%23222'/><rect x='41' y='14' width='2' height='30' fill='%23222'/><rect x='45' y='14' width='3' height='30' fill='%23222'/><text x='32' y='56' text-anchor='middle' font-size='10' font-family='sans-serif' fill='%23222'>SKU</text></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f5; color: #1a1a1a; min-height: 100vh;
+  }
+  .container { max-width: 720px; margin: 0 auto; padding: 48px 24px; }
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .subtitle { color: #666; font-size: 15px; margin-bottom: 40px; }
+
+  .step {
+    background: #fff; border: 1px solid #e0e0e0;
+    border-radius: 12px; padding: 24px; margin-bottom: 20px;
+  }
+  .step-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .step-number {
+    width: 32px; height: 32px; background: #1a1a1a; color: #fff;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px; flex-shrink: 0;
+  }
+  .step-title { font-size: 16px; font-weight: 600; }
+
+  .sheet-input-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .sheet-input-row input {
+    flex: 1; padding: 12px 14px; border: 1px solid #ddd;
+    border-radius: 8px; font-size: 14px; outline: none;
+  }
+  .sheet-input-row input:focus { border-color: #1a1a1a; }
+
+  .btn-sm {
+    padding: 12px 20px; background: #1a1a1a; color: #fff;
+    border: none; border-radius: 8px; font-size: 14px; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+  }
+  .btn-sm:hover { background: #333; }
+  .btn-sm:disabled { background: #ccc; cursor: not-allowed; }
+
+  .drop-zone {
+    border: 2px dashed #ccc; border-radius: 8px; padding: 32px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+    color: #888; font-size: 14px;
+  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: #1a1a1a; background: #fafafa; color: #1a1a1a; }
+  .drop-zone.has-file { border-color: #22c55e; background: #f0fdf4; color: #166534; }
+
+  .file-list { margin-top: 12px; font-size: 13px; color: #444; }
+  .file-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+  .file-item .name { flex: 1; }
+  .file-item .remove { color: #999; cursor: pointer; font-size: 18px; line-height: 1; }
+  .file-item .remove:hover { color: #e00; }
+
+  .csv-preview { margin-top: 12px; max-height: 220px; overflow: auto; font-size: 12px; border: 1px solid #eee; border-radius: 6px; }
+  .csv-preview table { width: 100%; border-collapse: collapse; }
+  .csv-preview th, .csv-preview td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
+  .csv-preview th { background: #f9f9f9; font-weight: 600; position: sticky; top: 0; }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 16px 24px; background: #1a1a1a; color: #fff;
+    border: none; border-radius: 10px; font-size: 16px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn:hover { background: #333; }
+  .btn:disabled { background: #ccc; cursor: not-allowed; }
+
+  .status { text-align: center; margin-top: 12px; font-size: 14px; color: #666; }
+  .status.error { color: #dc2626; }
+  .status.success { color: #16a34a; }
+  .help-text { font-size: 13px; color: #888; margin-top: 8px; line-height: 1.5; }
+
+  .or-divider { text-align: center; color: #aaa; font-size: 13px; margin: 16px 0; position: relative; }
+  .or-divider::before, .or-divider::after { content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: #e0e0e0; }
+  .or-divider::before { left: 0; }
+  .or-divider::after { right: 0; }
+
+  .progress-bar-container { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin-top: 12px; overflow: hidden; display: none; }
+  .progress-bar { height: 100%; background: #1a1a1a; border-radius: 3px; transition: width 0.3s ease; width: 0%; }
+
+  .instructions {
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+    padding: 12px 16px; margin-top: 12px; font-size: 13px; color: #92400e; line-height: 1.6;
+  }
+  .instructions ol { margin: 4px 0 0 18px; }
+
+  .prompt-box {
+    background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px;
+    padding: 14px 16px; margin-top: 12px; font-size: 13px; line-height: 1.6;
+    color: #333; position: relative;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 8px;
+    background: #eee; border: none; border-radius: 4px;
+    padding: 4px 10px; font-size: 11px; cursor: pointer; color: #555;
+  }
+  .copy-btn:hover { background: #ddd; }
+
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
+  .setting-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+  .setting-item label { font-size: 14px; color: #333; cursor: pointer; }
+  .setting-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #1a1a1a; }
+  .slider-row { margin-bottom: 8px; }
+  .slider-row label { font-size: 14px; color: #333; display: block; margin-bottom: 6px; }
+  .slider-row input[type="range"] { width: 100%; accent-color: #1a1a1a; }
+  .slider-value { font-size: 13px; color: #666; float: right; }
+  .settings-section { margin-top: 16px; padding-top: 12px; border-top: 1px solid #eee; }
+  .settings-section:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+  .settings-section-title { font-size: 13px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+
+  .template-selector { display: flex; gap: 12px; margin-bottom: 4px; }
+  .template-option {
+    flex: 1; padding: 14px; border: 2px solid #e0e0e0; border-radius: 10px;
+    cursor: pointer; text-align: center; transition: all 0.2s;
+  }
+  .template-option:hover { border-color: #999; }
+  .template-option.active { border-color: #1a1a1a; background: #f9f9f9; }
+  .template-option .tpl-icon { font-size: 28px; margin-bottom: 6px; }
+  .template-option .tpl-name { font-size: 14px; font-weight: 600; }
+  .template-option .tpl-desc { font-size: 12px; color: #888; margin-top: 2px; }
+
+  .preview-container { display: flex; justify-content: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; }
+  .preview-label {
+    width: 210px; height: 330px; background: #fff; border: 1px solid #ddd;
+    border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); position: relative; overflow: hidden;
+  }
+  .preview-label canvas { width: 100%; height: 100%; }
+
+  .barcode-specs { margin-top: 14px; font-size: 12px; color: #555; line-height: 1.7; }
+  .barcode-specs .spec-title { font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; margin-bottom: 6px; }
+  .barcode-specs .spec-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+  .barcode-specs .spec-row .val { font-variant-numeric: tabular-nums; font-weight: 600; color: #1a1a1a; }
+  .barcode-specs .ok { color: #16a34a; }
+  .barcode-specs .bad { color: #dc2626; }
+  .barcode-specs .spec-warn { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 6px; padding: 8px 10px; margin-top: 8px; }
+
+  /* ── Marketing / Photoshoot mode ── */
+  .mkt-row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .mkt-row label { font-size: 14px; color: #333; min-width: 150px; }
+  .mkt-row select {
+    flex: 1; min-width: 180px; padding: 10px 12px; border: 1px solid #ddd;
+    border-radius: 8px; font-size: 14px; background: #fff;
+  }
+  .mkt-count { font-size: 14px; color: #333; margin: 4px 0 12px; }
+  .mkt-count strong { font-size: 16px; }
+  .warn-box {
+    background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;
+    border-radius: 8px; padding: 10px 14px; font-size: 13px; line-height: 1.6; margin-top: 12px;
+  }
+  .warn-box ul { margin: 4px 0 0 18px; }
+  .mkt-preview-wrap { display: flex; flex-direction: column; align-items: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; }
+  .mkt-preview-wrap canvas { background: #fff; border: 1px solid #ccc; border-radius: 3px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); max-width: 100%; }
+  .preview-nav { display: flex; align-items: center; gap: 12px; margin-top: 10px; font-size: 13px; color: #555; }
+  .preview-nav button { padding: 6px 12px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .preview-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Label Generator</h1>
+  <p class="subtitle" id="subtitle">Connect your Google Sheet and upload illustrations to generate print-ready labels.</p>
+
+  <!-- Step 0: Mode -->
+  <div class="step" id="stepMode">
+    <div class="step-header">
+      <div class="step-number">1</div>
+      <div class="step-title">What are you printing?</div>
+    </div>
+    <div class="template-selector">
+      <div class="template-option active" id="modeWarehouse" onclick="selectMode('warehouse')">
+        <div class="tpl-icon">&#9783;</div>
+        <div class="tpl-name">Warehouse</div>
+        <div class="tpl-desc">Barcode labels, 70 x 110mm</div>
+      </div>
+      <div class="template-option" id="modeMarketing" onclick="selectMode('marketing')">
+        <div class="tpl-icon">&#128095;</div>
+        <div class="tpl-name">Marketing / Photoshoot</div>
+        <div class="tpl-desc">Simple shoe stickers for NiimBlue</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 1: Google Sheet -->
+  <div class="step" id="stepData">
+    <div class="step-header">
+      <div class="step-number">1</div>
+      <div class="step-title">Load product data</div>
+    </div>
+    <div class="sheet-input-row">
+      <input type="text" id="sheetUrl" placeholder="Paste your Google Sheet published CSV link...">
+      <button class="btn-sm" id="fetchBtn" onclick="fetchSheet()">Load</button>
+    </div>
+    <div class="instructions">
+      <strong>How to get the link:</strong>
+      <ol>
+        <li>Open your Google Sheet</li>
+        <li>Go to <strong>File &rarr; Share &rarr; Publish to web</strong></li>
+        <li>Under "Link", select your sheet tab and choose <strong>Comma-separated values (.csv)</strong></li>
+        <li>Click <strong>Publish</strong>, then copy the link and paste above</li>
+      </ol>
+    </div>
+
+    <div class="or-divider">or upload CSV file directly</div>
+
+    <input type="file" id="csvInput" accept=".csv,.txt" style="display:none">
+    <div class="drop-zone" id="csvDrop">
+      <span id="csvLabel">Drop CSV file here, or click to browse</span>
+    </div>
+    <p class="help-text" id="mktColumnsHelp" style="display:none">
+      Your sheet needs these columns (names can vary a little):
+      <strong>PIC</strong> (or Model Name), <strong>Product</strong> (or Shoe / Design),
+      <strong>Size</strong>, <strong>Colour</strong>, <strong>SKU</strong> (or Lifestyle).
+    </p>
+    <div id="csvPreview"></div>
+    <div id="sheetStatus" class="status"></div>
+  </div>
+
+  <!-- Marketing settings (Marketing mode only) -->
+  <div class="step" id="stepMarketing" style="display:none">
+    <div class="step-header">
+      <div class="step-number">3</div>
+      <div class="step-title">Choose labels</div>
+    </div>
+    <div class="mkt-row">
+      <label for="mktPicSelect">Print labels for</label>
+      <select id="mktPicSelect" onchange="mktPreviewIdx = 0; updatePreview(); updateBtn();">
+        <option value="__ALL__">Load your sheet first</option>
+      </select>
+    </div>
+    <div class="mkt-row">
+      <label for="mktSizeSelect">Label size (NiimBlue)</label>
+      <select id="mktSizeSelect" onchange="updatePreview()">
+        <option value="50x30" selected>50 x 30mm</option>
+        <option value="40x30">40 x 30mm</option>
+        <option value="50x40">50 x 40mm</option>
+        <option value="50x50">50 x 50mm</option>
+      </select>
+    </div>
+    <p class="help-text" style="margin-top:0">Pick the same size as the label roll in the printer and in NiimBlue.</p>
+    <div class="mkt-count" id="mktCount"></div>
+    <div id="mktWarnings"></div>
+    <div class="mkt-preview-wrap">
+      <canvas id="mktPreviewCanvas"></canvas>
+      <div class="preview-nav">
+        <button type="button" id="mktPrev" onclick="mktPreviewIdx--; updatePreview();">&#9664; Prev</button>
+        <span id="mktPreviewPos">-</span>
+        <button type="button" id="mktNext" onclick="mktPreviewIdx++; updatePreview();">Next &#9654;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Illustrations -->
+  <div class="step" id="stepIllustrations">
+    <div class="step-header">
+      <div class="step-number">2</div>
+      <div class="step-title">Upload illustrations</div>
+    </div>
+    <input type="file" id="imgInput" accept=".png,.jpg,.jpeg,.webp,image/*" multiple style="display:none">
+    <div class="drop-zone" id="imgDrop">
+      <span id="imgLabel">Drop illustration files here, or click to browse</span>
+    </div>
+    <p class="help-text">Filenames must match the <code>illustration_file</code> column in your sheet. Optional — labels generate without them.</p>
+    <div class="file-list" id="imgList"></div>
+  </div>
+
+  <!-- Step 3: Prompt reference -->
+  <div class="step" id="stepPrompt">
+    <div class="step-header">
+      <div class="step-number">3</div>
+      <div class="step-title">ChatGPT illustration prompt</div>
+    </div>
+    <p class="help-text" style="margin-top:0">Upload your product photo to ChatGPT with this prompt:</p>
+    <div class="prompt-box" id="promptBox">
+      <button class="copy-btn" onclick="copyPrompt()">Copy</button>
+      Create a minimal black line-art technical illustration of this shoe showing only the LEFT shoe from a side profile view (facing right). Use super thick clean outlines only — no shading, no fills, no color, no gradients, no shadows. Show key design details like buckles, stitching, mesh patterns, and cutouts as simple line work. The illustration should be on a pure white background with no ground line, no reflections, and no text. Style: flat technical product drawing suitable for a product label.
+    </div>
+  </div>
+
+  <!-- Step 4: Settings -->
+  <div class="step" id="stepSettings">
+    <div class="step-header">
+      <div class="step-number">4</div>
+      <div class="step-title">Label settings</div>
+    </div>
+
+    <div class="settings-section" style="padding-top:0; border-top:none; margin-top:0;">
+      <div class="settings-section-title">Template</div>
+      <div class="template-selector">
+        <div class="template-option active" id="tplFull" onclick="selectTemplate('full')">
+          <div class="tpl-icon">&#9783;</div>
+          <div class="tpl-name">Full Label</div>
+          <div class="tpl-desc">Title, barcode, size, illustration, footer</div>
+        </div>
+        <div class="template-option" id="tplBarcode" onclick="selectTemplate('barcode')">
+          <div class="tpl-icon">&#9655;</div>
+          <div class="tpl-name">Barcode Only</div>
+          <div class="tpl-desc">Full-page barcode with SKU</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="settingsDetail">
+      <div class="settings-section">
+        <div class="settings-section-title">Title</div>
+        <div class="setting-item" style="padding-top:0">
+          <label for="titleAuto">Auto-fit to barcode</label>
+          <input type="checkbox" id="titleAuto" checked onchange="updatePreview()">
+        </div>
+        <div class="slider-row">
+          <label>Title band height <span class="slider-value" id="titleHVal">22mm</span></label>
+          <input type="range" id="titleHSlider" min="8" max="30" value="22" oninput="document.getElementById('titleHVal').textContent=this.value+'mm'; updatePreview()">
+        </div>
+        <p class="help-text" style="margin-top:0">The barcode runs down the label, so every mm here is taken from the barcode. Auto-fit gives the title all the room the barcode does not need, sized from the longest SKU in your sheet so every label in a run matches.</p>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Barcode</div>
+        <div class="slider-row">
+          <label>Barcode column width <span class="slider-value" id="bcWidthVal">57%</span></label>
+          <input type="range" id="bcWidthSlider" min="30" max="100" value="57" oninput="document.getElementById('bcWidthVal').textContent=this.value+'%'; updatePreview()">
+        </div>
+        <div class="slider-row">
+          <label>SKU text size <span class="slider-value" id="skuFontSizeVal">16pt</span></label>
+          <input type="range" id="skuFontSizeSlider" min="6" max="24" value="16" oninput="document.getElementById('skuFontSizeVal').textContent=this.value+'pt'; updatePreview()">
+        </div>
+        <div class="slider-row">
+          <label>SKU font</label>
+          <select id="skuFontSelect" onchange="updatePreview()" style="padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:13px; background:#fff;">
+            <option value="Arial" selected>Arial</option>
+            <option value="Helvetica">Helvetica</option>
+            <option value="sans-serif">Sans-serif</option>
+            <option value="monospace">Monospace</option>
+            <option value="Courier New">Courier New</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Footer</div>
+        <div class="slider-row">
+          <label>Footer font size <span class="slider-value" id="footerFontVal">10pt</span></label>
+          <input type="range" id="footerFontSlider" min="6" max="14" value="10" oninput="document.getElementById('footerFontVal').textContent=this.value+'pt'; updatePreview()">
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Show / Hide Elements</div>
+        <div class="settings-grid">
+          <div class="setting-item">
+            <label for="showTitle">Product title</label>
+            <input type="checkbox" id="showTitle" checked onchange="updatePreview()">
+          </div>
+          <div class="setting-item">
+            <label for="showBarcode">Barcode</label>
+            <input type="checkbox" id="showBarcode" checked onchange="updatePreview()">
+          </div>
+          <div class="setting-item">
+            <label for="showSKU">SKU text</label>
+            <input type="checkbox" id="showSKU" checked onchange="updatePreview()">
+          </div>
+          <div class="setting-item">
+            <label for="showSize">Size number</label>
+            <input type="checkbox" id="showSize" checked onchange="updatePreview()">
+          </div>
+          <div class="setting-item">
+            <label for="showIllustration">Illustration</label>
+            <input type="checkbox" id="showIllustration" checked onchange="updatePreview()">
+          </div>
+          <div class="setting-item">
+            <label for="showColour">Colour</label>
+            <input type="checkbox" id="showColour" checked onchange="updatePreview()">
+          </div>
+          <div class="setting-item">
+            <label for="showSizeFooter">Size (footer)</label>
+            <input type="checkbox" id="showSizeFooter" onchange="updatePreview()">
+          </div>
+          <div class="setting-item">
+            <label for="showDividers">Divider lines</label>
+            <input type="checkbox" id="showDividers" checked onchange="updatePreview()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-container">
+      <div class="preview-label">
+        <canvas id="previewCanvas" width="280" height="440"></canvas>
+      </div>
+    </div>
+    <div class="barcode-specs" id="barcodeSpecs"></div>
+  </div>
+
+  <!-- Step 5: Generate -->
+  <div class="step" id="stepGenerate">
+    <div class="step-header">
+      <div class="step-number">5</div>
+      <div class="step-title">Generate labels</div>
+    </div>
+    <button class="btn" id="generateBtn" onclick="generateLabels()" disabled>
+      Generate PDF
+    </button>
+    <div class="progress-bar-container" id="progressContainer">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<script>
+var jsPDF = window.jspdf.jsPDF;
+var csvData = [];
+var imgFiles = {};
+
+// ─── STATUS & UTILS ──────────────────────────────────────────
+
+function setStatus(msg, type) {
+  var el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+function setSheetStatus(msg, type) {
+  var el = document.getElementById('sheetStatus');
+  el.textContent = msg;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+function updateBtn() {
+  var count = currentMode === 'marketing' ? getMktSelection().length : csvData.length;
+  document.getElementById('generateBtn').disabled = count === 0;
+}
+
+function copyPrompt() {
+  var text = document.getElementById('promptBox').textContent.replace('Copy', '').trim();
+  navigator.clipboard.writeText(text);
+  var btn = document.querySelector('.copy-btn');
+  btn.textContent = 'Copied!';
+  setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+}
+
+// ─── PROCESS CSV DATA ────────────────────────────────────────
+
+// Keep the raw parse so switching mode re-checks the same data without reloading.
+var rawResults = null, rawSource = '';
+
+function processCSVResults(results, source) {
+  rawResults = results;
+  rawSource = source;
+  applyData();
+}
+
+function applyData() {
+  if (!rawResults) return;
+  if (currentMode === 'marketing') loadMarketingData(rawResults, rawSource);
+  else validateWarehouse(rawResults, rawSource);
+}
+
+// Original warehouse logic, unchanged.
+function validateWarehouse(results, source) {
+  if (results.errors.length && !results.data.length) {
+    setSheetStatus('Error parsing data: ' + results.errors[0].message, 'error');
+    return;
+  }
+
+  csvData = results.data.filter(function(row) {
+    return row.product_name && row.product_name.trim();
+  });
+
+  var headers = results.meta.fields || [];
+  var required = ['product_name', 'sku', 'size', 'color'];
+  var missing = required.filter(function(h) { return headers.indexOf(h) === -1; });
+
+  if (missing.length) {
+    setSheetStatus('Missing columns: ' + missing.join(', ') + '. Need: product_name, sku, size, color, illustration_file', 'error');
+    csvData = [];
+    updateBtn();
+    return;
+  }
+
+  showCSVPreview(headers, csvData);
+  setSheetStatus('Loaded ' + csvData.length + ' products from ' + source, 'success');
+  updateBtn();
+  updatePreview();
+}
+
+// ─── GOOGLE SHEET ────────────────────────────────────────────
+
+function getPublishedCsvUrl(url) {
+  url = url.trim();
+  if (url.indexOf('/pub') !== -1 && url.indexOf('output=csv') !== -1) return url;
+  if (url.indexOf('output=csv') !== -1) return url;
+
+  var match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) {
+    var id = match[1];
+    var gidMatch = url.match(/gid=(\d+)/);
+    var gid = gidMatch ? gidMatch[1] : '0';
+    return 'https://docs.google.com/spreadsheets/d/' + id + '/pub?gid=' + gid + '&single=true&output=csv';
+  }
+  return null;
+}
+
+function fetchSheet() {
+  var url = document.getElementById('sheetUrl').value.trim();
+  if (!url) { setSheetStatus('Please paste a URL first', 'error'); return; }
+
+  var btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+  setSheetStatus('Connecting to Google Sheet...', '');
+
+  var csvUrl = getPublishedCsvUrl(url);
+  if (!csvUrl) {
+    setSheetStatus('Invalid URL. Paste the link from "Publish to web" (see instructions above).', 'error');
+    btn.disabled = false;
+    btn.textContent = 'Load';
+    return;
+  }
+
+  Papa.parse(csvUrl, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      btn.disabled = false;
+      btn.textContent = 'Load';
+      processCSVResults(results, 'Google Sheet');
+    },
+    error: function() {
+      btn.disabled = false;
+      btn.textContent = 'Load';
+      setSheetStatus('Network error loading sheet. Check that the sheet is published to web and try again.', 'error');
+    }
+  });
+}
+
+// ─── CSV FILE UPLOAD ─────────────────────────────────────────
+
+var csvDrop = document.getElementById('csvDrop');
+var csvInput = document.getElementById('csvInput');
+
+csvDrop.addEventListener('click', function(e) { e.stopPropagation(); csvInput.click(); });
+csvDrop.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); csvDrop.classList.add('dragover'); });
+csvDrop.addEventListener('dragleave', function(e) { e.preventDefault(); csvDrop.classList.remove('dragover'); });
+csvDrop.addEventListener('drop', function(e) {
+  e.preventDefault(); e.stopPropagation();
+  csvDrop.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleCSVFile(e.dataTransfer.files[0]);
+});
+csvInput.addEventListener('change', function() {
+  if (csvInput.files.length) {
+    handleCSVFile(csvInput.files[0]);
+    csvInput.value = '';
+  }
+});
+
+function handleCSVFile(file) {
+  csvDrop.classList.add('has-file');
+  document.getElementById('csvLabel').textContent = '✓ ' + file.name;
+
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      processCSVResults(results, file.name);
+    }
+  });
+}
+
+function escHtml(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function showCSVPreview(headers, data) {
+  var html = '<div class="csv-preview"><table><tr>';
+  headers.forEach(function(h) { html += '<th>' + escHtml(h) + '</th>'; });
+  html += '</tr>';
+  data.slice(0, 6).forEach(function(row) {
+    html += '<tr>';
+    headers.forEach(function(h) { html += '<td>' + escHtml(row[h]) + '</td>'; });
+    html += '</tr>';
+  });
+  if (data.length > 6) {
+    html += '<tr><td colspan="' + headers.length + '" style="color:#888;text-align:center">... and ' + (data.length - 6) + ' more rows</td></tr>';
+  }
+  html += '</table></div>';
+  document.getElementById('csvPreview').innerHTML = html;
+}
+
+// ─── ILLUSTRATION UPLOAD ─────────────────────────────────────
+
+var imgDrop = document.getElementById('imgDrop');
+var imgInput = document.getElementById('imgInput');
+
+imgDrop.addEventListener('click', function(e) { e.stopPropagation(); imgInput.click(); });
+imgDrop.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); imgDrop.classList.add('dragover'); });
+imgDrop.addEventListener('dragleave', function(e) { e.preventDefault(); imgDrop.classList.remove('dragover'); });
+imgDrop.addEventListener('drop', function(e) {
+  e.preventDefault(); e.stopPropagation();
+  imgDrop.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleImages(e.dataTransfer.files);
+});
+imgInput.addEventListener('change', function() {
+  if (imgInput.files.length) {
+    handleImages(imgInput.files);
+    imgInput.value = '';
+  }
+});
+
+function handleImages(files) {
+  for (var i = 0; i < files.length; i++) {
+    imgFiles[files[i].name] = files[i];
+  }
+  renderImageList();
+}
+
+function removeImage(name) {
+  delete imgFiles[name];
+  renderImageList();
+}
+
+function renderImageList() {
+  var names = Object.keys(imgFiles);
+  var label = document.getElementById('imgLabel');
+  var list = document.getElementById('imgList');
+
+  if (!names.length) {
+    list.innerHTML = '';
+    imgDrop.classList.remove('has-file');
+    label.textContent = 'Drop illustration files here, or click to browse';
+    return;
+  }
+
+  imgDrop.classList.add('has-file');
+  label.textContent = '✓ ' + names.length + ' illustration(s) uploaded';
+
+  var html = '';
+  names.forEach(function(n) {
+    html += '<div class="file-item"><span class="name">' + n + '</span><span class="remove" onclick="removeImage(\'' + n.replace(/'/g, "\\'") + '\')">x</span></div>';
+  });
+  list.innerHTML = html;
+}
+
+// ─── TEMPLATE SELECTION ─────────────────────────────────────
+
+var currentTemplate = 'full';
+
+function selectTemplate(tpl) {
+  currentTemplate = tpl;
+  document.getElementById('tplFull').classList.toggle('active', tpl === 'full');
+  document.getElementById('tplBarcode').classList.toggle('active', tpl === 'barcode');
+
+  if (tpl === 'barcode') {
+    // Nothing but the symbol — it centres on the full 70x110mm label.
+    document.getElementById('showBarcode').checked = true;
+    document.getElementById('showSKU').checked = true;
+    document.getElementById('showTitle').checked = false;
+    document.getElementById('showSize').checked = false;
+    document.getElementById('showIllustration').checked = false;
+    document.getElementById('showColour').checked = false;
+    document.getElementById('showSizeFooter').checked = false;
+    document.getElementById('showDividers').checked = false;
+    document.getElementById('bcWidthSlider').value = 100;
+    document.getElementById('bcWidthVal').textContent = '100%';
+  } else {
+    document.getElementById('showBarcode').checked = true;
+    document.getElementById('showSKU').checked = true;
+    document.getElementById('showTitle').checked = true;
+    document.getElementById('showSize').checked = true;
+    document.getElementById('showIllustration').checked = true;
+    document.getElementById('showColour').checked = true;
+    document.getElementById('showSizeFooter').checked = false;
+    document.getElementById('showDividers').checked = true;
+    document.getElementById('bcWidthSlider').value = 57;
+    document.getElementById('bcWidthVal').textContent = '57%';
+    document.getElementById('titleAuto').checked = true;
+    document.getElementById('titleHSlider').value = 22;
+    document.getElementById('titleHVal').textContent = '22mm';
+    document.getElementById('footerFontSlider').value = 10;
+    document.getElementById('footerFontVal').textContent = '10pt';
+    document.getElementById('skuFontSizeSlider').value = 16;
+    document.getElementById('skuFontSizeVal').textContent = '16pt';
+    document.getElementById('skuFontSelect').value = 'Arial';
+  }
+  updatePreview();
+}
+
+// ─── SETTINGS ───────────────────────────────────────────────
+
+function getSettings() {
+  return {
+    template: currentTemplate,
+    bcWidth: parseInt(document.getElementById('bcWidthSlider').value) / 100,
+    titleAuto: document.getElementById('titleAuto').checked,
+    titleH: parseInt(document.getElementById('titleHSlider').value),
+    footerFontSize: parseInt(document.getElementById('footerFontSlider').value),
+    showTitle: document.getElementById('showTitle').checked,
+    showBarcode: document.getElementById('showBarcode').checked,
+    showSKU: document.getElementById('showSKU').checked,
+    showSize: document.getElementById('showSize').checked,
+    showIllustration: document.getElementById('showIllustration').checked,
+    showColour: document.getElementById('showColour').checked,
+    showSizeFooter: document.getElementById('showSizeFooter').checked,
+    showDividers: document.getElementById('showDividers').checked,
+    skuFontSize: parseInt(document.getElementById('skuFontSizeSlider').value),
+    skuFont: document.getElementById('skuFontSelect').value,
+  };
+}
+
+// All-numeric sample: letters and dashes cost 11 modules each vs 5.5 per digit,
+// so a placeholder with dashes would show a false "below spec" warning.
+var SAMPLE_SKU = '4800001035';
+
+// The value encoded in the barcode for a row: the SKU with the size appended,
+// unless the SKU already ends with it or there is no size.
+function skuForRow(row) {
+  var rawSku = (row.sku || '').trim();
+  var rawSize = (row.size || '').trim();
+  return (!rawSize || rawSku.endsWith('-' + rawSize)) ? rawSku : rawSku + '-' + rawSize;
+}
+
+function getSampleData() {
+  var d = { title: 'SAMPLE PRODUCT NAME', sku: SAMPLE_SKU, size: '35', colour: 'BLACK' };
+  if (csvData.length) {
+    var r = csvData[0];
+    d.title = (r.product_name || '').toUpperCase().trim() || d.title;
+    d.sku = skuForRow(r) || d.sku;
+    d.size = (r.size || '').trim() || d.size;
+    d.colour = (r.color || '').toUpperCase().trim() || d.colour;
+  }
+  return d;
+}
+
+// ─── SHARED LAYOUT CALCULATOR ───────────────────────────────
+// Returns layout zones in mm (used by both preview and PDF)
+
+function calcLayout(s) {
+  var LW = 70, LH = 110;
+  var titleH = s.showTitle ? (s.titleAuto ? autoTitleH(s) : s.titleH) : 0;
+  var hasFooter = s.showColour || s.showSizeFooter;
+  var footerH = hasFooter ? 12 : 0;
+  var bodyTop = titleH;
+  var footerTop = LH - footerH;
+  var bodyH = footerTop - bodyTop;
+  var bcColW = LW * s.bcWidth;
+  var rightX = bcColW;
+  var rightW = LW - bcColW;
+  var sizeZoneH = bodyH * 0.38;
+
+  return {
+    LW: LW, LH: LH,
+    titleH: titleH, titleBottom: titleH,
+    footerTop: footerTop, footerH: footerH, hasFooter: hasFooter,
+    bodyTop: bodyTop, bodyH: bodyH,
+    bcColW: bcColW,
+    rightX: rightX, rightW: rightW,
+    sizeZoneH: sizeZoneH,
+    sizeZoneBottom: bodyTop + sizeZoneH,
+  };
+}
+
+// ─── BARCODE GENERATION ─────────────────────────────────────
+
+// Fulfilment team's Code 128 spec — treated as MINIMUMS, not targets.
+var SPEC_MIN_X = 0.63;      // narrow-bar (X) dimension, mm
+var SPEC_MIN_BAR_H = 13.7;  // bar height, mm
+// Code 128 requires a blank quiet zone of 10x the X dimension at each END of
+// the code. Too small a quiet zone is the classic cause of "some scanners
+// read it, some don't" — strict laser scanners refuse, phone cameras forgive.
+var QUIET_MODULES = 10;
+var TEXT_GAP = 1.0;         // gap between the SKU text and the bars, mm
+
+// Margin between the symbol and the label edge / divider. The full label is
+// tight on space so it stays slim; the barcode-only label has room to breathe.
+function edgePad(s) { return s.template === 'barcode' ? 4 : 1.5; }
+var PX_PER_MODULE = 16;     // raster density -> ~580 DPI at a 0.7mm module
+
+// Count the modules (narrow-bar units) a CODE128 symbol needs.
+// Rendered at 1px per module with no margin, canvas width == module count.
+// Memoised — the preview asks for this on every keystroke, once per CSV row.
+var moduleCache = {};
+function countCode128Modules(text) {
+  if (moduleCache[text] != null) return moduleCache[text];
+  var c = document.createElement('canvas');
+  try {
+    JsBarcode(c, text, {
+      format: 'CODE128', width: 1, height: 10, margin: 0, displayValue: false
+    });
+  } catch(e) {
+    console.error('Barcode encoding failed:', e);
+    return null;
+  }
+  moduleCache[text] = c.width;
+  return c.width;
+}
+
+// The title band gets whatever height the barcode does not need, sized from the
+// LONGEST SKU in the batch so every label in one run shares the same layout.
+var TITLE_H_MIN = 8, TITLE_H_MAX = 22;
+function autoTitleH(s) {
+  var skus = csvData.length
+    ? csvData.map(skuForRow)
+    : [SAMPLE_SKU];
+  var maxModules = 0;
+  for (var i = 0; i < skus.length; i++) {
+    var m = countCode128Modules(skus[i]);
+    if (m && m > maxModules) maxModules = m;
+  }
+  if (!maxModules) return TITLE_H_MAX;
+  var need = 110 - 2 * edgePad(s) - SPEC_MIN_X * (maxModules + 2 * QUIET_MODULES);
+  return Math.max(TITLE_H_MIN, Math.min(TITLE_H_MAX, Math.floor(need)));
+}
+
+// Work out the barcode's real-world size in mm before drawing anything.
+// The symbol is rotated 90 CW, so the code runs DOWN the label and the bar
+// height runs ACROSS it.
+function calcBarcodeGeom(s, L, text) {
+  var modules = countCode128Modules(text);
+  if (!modules) return null;
+
+  var pad = edgePad(s);
+
+  // Along the code (vertical): quiet zone + code + quiet zone fills the column.
+  var alongAvail = L.LH - L.bodyTop - 2 * pad;
+  var X = alongAvail / (modules + 2 * QUIET_MODULES);
+  var quiet = QUIET_MODULES * X;
+
+  // Across the bars (horizontal): SKU text sits to the left of the bars.
+  var acrossAvail = L.bcColW - 2 * pad;
+  var textMM = s.showSKU ? s.skuFontSize * 0.3528 : 0;   // pt -> mm
+  var barH = acrossAvail - (s.showSKU ? textMM + TEXT_GAP : 0);
+
+  return {
+    modules: modules,
+    X: X,
+    quiet: quiet,
+    textMM: textMM,
+    barH: barH,
+    alongTop: L.bodyTop + pad,
+    alongAvail: alongAvail,
+    acrossLeft: pad,
+    acrossAvail: acrossAvail,
+    okX: X >= SPEC_MIN_X,
+    okBarH: barH >= SPEC_MIN_BAR_H
+  };
+}
+
+// Render the symbol at the exact mm geometry calcBarcodeGeom worked out.
+// Returns { url, alongMM, acrossMM } — place it at that size and the bars keep
+// their true proportions. Never stretch this image to fill a box.
+function generateBarcodeDataUrl(text, s, geom) {
+  var mmPerPx = geom.X / PX_PER_MODULE;
+  var srcCanvas = document.createElement('canvas');
+  try {
+    JsBarcode(srcCanvas, text, {
+      format: 'CODE128',
+      width: PX_PER_MODULE,
+      height: Math.max(1, Math.round(geom.barH / mmPerPx)),
+      displayValue: s.showSKU,
+      fontSize: Math.max(1, Math.round(geom.textMM / mmPerPx)),
+      font: s.skuFont || 'Arial',
+      textMargin: Math.round(TEXT_GAP / mmPerPx),
+      // Quiet zone belongs at the two ENDS of the code only (left/right here,
+      // which become top/bottom once rotated). No padding on the other axis.
+      margin: 0,
+      marginLeft: Math.round(geom.quiet / mmPerPx),
+      marginRight: Math.round(geom.quiet / mmPerPx)
+    });
+  } catch(e) {
+    console.error('Barcode generation failed:', e);
+    return null;
+  }
+
+  // Rotate 90 CW: bars become horizontal, SKU text reads bottom-to-top.
+  var w = srcCanvas.width, h = srcCanvas.height;
+  var rotCanvas = document.createElement('canvas');
+  rotCanvas.width = h;
+  rotCanvas.height = w;
+  var ctx = rotCanvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, h, w);
+  ctx.translate(h / 2, w / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.drawImage(srcCanvas, -w / 2, -h / 2);
+
+  var alongMM = w * mmPerPx;    // down the label
+  var acrossMM = h * mmPerPx;   // across the label
+
+  // If the text/bar stack came out fractionally wider than the column, shrink
+  // BOTH axes by the same factor so the bar proportions stay intact.
+  var fit = Math.min(1, geom.acrossAvail / acrossMM, geom.alongAvail / alongMM);
+
+  return {
+    url: rotCanvas.toDataURL('image/png'),
+    alongMM: alongMM * fit,
+    acrossMM: acrossMM * fit,
+    X: geom.X * fit,
+    barH: geom.barH * fit,
+    quiet: geom.quiet * fit
+  };
+}
+
+// Live measurement readout so the printed symbol can be checked against spec.
+function renderBarcodeSpecs(bc, geom, s) {
+  var el = document.getElementById('barcodeSpecs');
+  if (!el) return;
+  if (!s.showBarcode || !bc) { el.innerHTML = ''; return; }
+
+  function row(label, val, unit, ok, min) {
+    return '<div class="spec-row"><span>' + label +
+      (min ? ' <span style="color:#aaa">(min ' + min + unit + ')</span>' : '') +
+      '</span><span class="val ' + (ok === null ? '' : ok ? 'ok' : 'bad') + '">' +
+      val.toFixed(2) + unit + (ok === null ? '' : ok ? ' ✓' : ' ✗') + '</span></div>';
+  }
+
+  var okX = bc.X >= SPEC_MIN_X;
+  var okH = bc.barH >= SPEC_MIN_BAR_H;
+  var html = '<div class="spec-title">Printed barcode — Code 128</div>' +
+    row('X dimension (narrow bar)', bc.X, 'mm', okX, SPEC_MIN_X) +
+    row('Bar height', bc.barH, 'mm', okH, SPEC_MIN_BAR_H) +
+    row('Quiet zone (each end)', bc.quiet, 'mm', true, null) +
+    '<div class="spec-row"><span>Density</span><span class="val">' +
+      (1 / (5.5 * bc.X)).toFixed(3) + ' chars/mm</span></div>';
+
+  if (!okX || !okH) {
+    // X depends only on the label's HEIGHT (the code runs down it), so the
+    // levers are SKU length and the title band — NOT the column width.
+    // Column width only changes bar height, which runs across the label.
+    var maxModules = Math.floor(geom.alongAvail / SPEC_MIN_X) - 2 * QUIET_MODULES;
+    var maxDigits = Math.floor((maxModules - 35) / 5.5);  // Code C: 5.5 modules per digit
+    var maxChars = Math.floor((maxModules - 35) / 11);    // Code B: 11 modules per character
+
+    html += '<div class="spec-warn"><strong>Below spec.</strong> ';
+    if (!okX) {
+      html += 'This SKU needs ' + geom.modules + ' modules but only ' + maxModules +
+        ' fit at 0.63mm bars. ';
+      // The code runs down the label, so the title band is the only lever.
+      var needTitleH = 110 - 2 * edgePad(s) - SPEC_MIN_X * (geom.modules + 2 * QUIET_MODULES);
+      if (s.showTitle && needTitleH >= 8) {
+        html += '<strong>Set the title band to ' + Math.floor(needTitleH) +
+          'mm or less</strong> and this SKU will meet spec. ';
+      } else if (s.showTitle && needTitleH > 0) {
+        html += 'Even with no title band this SKU will not fit — it needs ' +
+          Math.ceil(SPEC_MIN_X * (geom.modules + 2 * QUIET_MODULES)) +
+          'mm of label height and only ' + Math.floor(110 - 2 * edgePad(s)) + 'mm exists. ';
+      } else {
+        html += 'This SKU cannot meet spec on a 70x110mm label at any setting. ';
+      }
+      html += 'Digits pack twice as tightly as letters or dashes: this label holds <strong>' +
+        maxDigits + ' digits</strong> but only ' + maxChars +
+        ' characters once a letter or dash is present. ';
+    }
+    if (!okH) {
+      html += 'Bar height is short — widen the barcode column or reduce the SKU text size.';
+    }
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function loadImageAsDataUrl(file) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function(e) { resolve(e.target.result); };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ─── LIVE PREVIEW ───────────────────────────────────────────
+
+function updatePreview() {
+  if (currentMode === 'marketing') { drawMarketingPreview(); return; }
+  var canvas = document.getElementById('previewCanvas');
+  var ctx = canvas.getContext('2d');
+  var s = getSettings();
+  var d = getSampleData();
+  var L = calcLayout(s);
+
+  // Show the auto-fitted band on the slider, and lock it so it reads as derived.
+  var thSlider = document.getElementById('titleHSlider');
+  thSlider.disabled = s.titleAuto;
+  thSlider.style.opacity = s.titleAuto ? 0.45 : 1;
+  if (s.titleAuto) {
+    thSlider.value = L.titleH || TITLE_H_MAX;
+    document.getElementById('titleHVal').textContent =
+      (s.showTitle ? L.titleH + 'mm (auto)' : 'off');
+  }
+
+  var W = 280, H = 440;
+  var sc = W / L.LW; // scale: canvas px per mm
+  canvas.width = W;
+  canvas.height = H;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+
+  // ── Title ──
+  if (s.showTitle) {
+    ctx.fillStyle = '#000';
+    ctx.textBaseline = 'middle';
+    var titleW = W - 4 * sc;
+    // Mirror the PDF's shrink-to-fit loop so the preview stays honest when the
+    // title band is resized (pt -> mm is 0.3528, line height is 0.45 * pt).
+    var tfs = 18, lines, lh, tBlockH;
+    while (tfs >= 7) {
+      ctx.font = 'bold ' + (tfs * 0.3528 * sc) + 'px -apple-system, sans-serif';
+      lines = wrapText(ctx, d.title, titleW);
+      lh = tfs * 0.45 * sc;
+      tBlockH = lines.length * lh;
+      if (tBlockH <= (L.titleH - 4) * sc) break;
+      tfs -= 1;
+    }
+    lines = clampTitleLines(lines, lh / sc, L.titleH);
+    tBlockH = lines.length * lh;
+    var tStartY = (L.titleBottom * sc) / 2 - tBlockH / 2 + lh / 2;
+    lines.forEach(function(line, i) { ctx.fillText(line, 2 * sc, tStartY + i * lh); });
+  }
+
+  // ── Title divider (full width) ──
+  if (s.showDividers && s.showTitle) {
+    ctx.beginPath();
+    ctx.moveTo(0, L.titleBottom * sc);
+    ctx.lineTo(W, L.titleBottom * sc);
+    ctx.stroke();
+  }
+
+  // ── Footer ──
+  var ftY = L.footerTop * sc;
+  if (L.hasFooter) {
+    // Footer divider — only on right side if barcode present
+    if (s.showDividers) {
+      var divStartX = s.showBarcode ? L.bcColW * sc : 0;
+      ctx.beginPath();
+      ctx.moveTo(divStartX, ftY);
+      ctx.lineTo(W, ftY);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'right';
+    var ffs = s.footerFontSize * sc / 4;
+    ctx.font = ffs + 'px -apple-system, sans-serif';
+    var footerMidY = ftY + (H - ftY) / 2;
+
+    if (s.showColour && s.showSizeFooter) {
+      ctx.textBaseline = 'top';
+      var fy = ftY + 2 * sc;
+      ctx.fillText('COLOUR: ' + d.colour, W - 2 * sc, fy);
+      fy += 4 * sc;
+      ctx.fillText('SIZE: ' + d.size, W - 2 * sc, fy);
+    } else if (s.showColour) {
+      ctx.textBaseline = 'middle';
+      ctx.fillText('COLOUR: ' + d.colour, W - 2 * sc, footerMidY);
+    } else if (s.showSizeFooter) {
+      ctx.textBaseline = 'middle';
+      ctx.fillText('SIZE: ' + d.size, W - 2 * sc, footerMidY);
+    }
+    ctx.textAlign = 'left';
+  }
+
+  // ── Vertical barcode/right divider ──
+  if (s.showDividers && L.bcColW < L.LW) {
+    var divTop = L.bodyTop * sc;
+    var divBot = L.footerTop * sc;
+    ctx.beginPath();
+    ctx.moveTo(L.bcColW * sc, divTop);
+    ctx.lineTo(L.bcColW * sc, divBot);
+    ctx.stroke();
+  }
+
+  // ── Size / illustration horizontal divider (right side only) ──
+  if (s.showDividers && (s.showSize || s.showIllustration) && L.bcColW < L.LW) {
+    ctx.beginPath();
+    ctx.moveTo(L.bcColW * sc, L.sizeZoneBottom * sc);
+    ctx.lineTo(W, L.sizeZoneBottom * sc);
+    ctx.stroke();
+  }
+
+  // ── Size number ──
+  if (s.showSize && L.rightW > 0) {
+    ctx.font = 'bold ' + (52 * sc / 4) + 'px -apple-system, sans-serif';
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var sizeCX = (L.rightX + L.LW) / 2 * sc;
+    ctx.fillText(d.size, sizeCX, (L.bodyTop + L.sizeZoneH / 2) * sc);
+    ctx.textAlign = 'left';
+  }
+
+  // ── Illustration placeholder ──
+  if (s.showIllustration && L.rightW > 0) {
+    var iX = L.rightX * sc + 3 * sc;
+    var iY = L.sizeZoneBottom * sc + 3 * sc;
+    var iW = L.rightW * sc - 6 * sc;
+    var iH = (L.footerTop - L.sizeZoneBottom) * sc - 6 * sc;
+    if (iW > 0 && iH > 0) {
+      ctx.strokeStyle = '#ccc';
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(iX, iY, iW, iH);
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#000';
+      ctx.font = (10 * sc / 4) + 'px -apple-system, sans-serif';
+      ctx.fillStyle = '#ccc';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('[illustration]', iX + iW / 2, iY + iH / 2);
+      ctx.fillStyle = '#000';
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // ── Barcode — drawn at its true mm size, never stretched ──
+  var bcInfo = null, bcGeom = null;
+  if (s.showBarcode) {
+    bcGeom = calcBarcodeGeom(s, L, d.sku);
+    if (bcGeom) {
+      bcInfo = generateBarcodeDataUrl(d.sku, s, bcGeom);
+      if (bcInfo) {
+        var bcImg = new Image();
+        bcImg.onload = function() { drawPreviewBarcode(ctx, bcImg, bcInfo, bcGeom, sc); };
+        bcImg.src = bcInfo.url;
+        // Draw immediately too — the image is a data URL and is usually ready.
+        try { drawPreviewBarcode(ctx, bcImg, bcInfo, bcGeom, sc); } catch(e) {}
+      }
+    }
+  }
+  renderBarcodeSpecs(bcInfo, bcGeom, s);
+}
+
+function drawPreviewBarcode(ctx, img, bc, geom, sc) {
+  // Centre the symbol in the space left over on each axis.
+  var x = (geom.acrossLeft + (geom.acrossAvail - bc.acrossMM) / 2) * sc;
+  var y = (geom.alongTop + (geom.alongAvail - bc.alongMM) / 2) * sc;
+  ctx.drawImage(img, x, y, bc.acrossMM * sc, bc.alongMM * sc);
+}
+
+// Drop any line that would not fit inside the title band. The title sits
+// directly above the barcode column, so an overflowing title would eat into the
+// quiet zone and quietly break scanning — truncate instead.
+function clampTitleLines(lines, lineH, titleH) {
+  var maxLines = Math.max(1, Math.floor((titleH - 1) / lineH));
+  if (lines.length <= maxLines) return lines;
+  var kept = lines.slice(0, maxLines);
+  kept[maxLines - 1] = kept[maxLines - 1].replace(/\s+\S*$/, '') + '...';
+  return kept;
+}
+
+function wrapText(ctx, text, maxW) {
+  var words = text.split(' ');
+  var lines = [];
+  var line = '';
+  for (var i = 0; i < words.length; i++) {
+    var test = line ? line + ' ' + words[i] : words[i];
+    if (ctx.measureText(test).width > maxW && line) {
+      lines.push(line);
+      line = words[i];
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// ─── PDF GENERATION ──────────────────────────────────────────
+
+async function generateLabels() {
+  if (currentMode === 'marketing') return generateMarketingLabels();
+  var btn = document.getElementById('generateBtn');
+  var progressContainer = document.getElementById('progressContainer');
+  var progressBar = document.getElementById('progressBar');
+
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  progressContainer.style.display = 'block';
+  progressBar.style.width = '0%';
+  setStatus('');
+
+  try {
+    var settings = getSettings();
+    var L = calcLayout(settings);
+    var LW = L.LW, LH = L.LH, PAD = 2, LINE_W = 0.3;
+    var doc = new jsPDF({ unit: 'mm', format: [LW, LH] });
+    var underspec = [];  // SKUs whose bars ended up below the 0.63mm minimum
+
+    // Pre-load illustrations
+    var illustrationDataUrls = {};
+    for (var name in imgFiles) {
+      illustrationDataUrls[name] = await loadImageAsDataUrl(imgFiles[name]);
+    }
+
+    for (var i = 0; i < csvData.length; i++) {
+      var row = csvData[i];
+      if (i > 0) doc.addPage([LW, LH]);
+
+      var skuFull = skuForRow(row);
+      var title = (row.product_name || '').toUpperCase().trim();
+      var size = (row.size || '').trim();
+      var color = (row.color || '').toUpperCase().trim();
+
+      doc.setDrawColor(0);
+      doc.setLineWidth(LINE_W);
+
+      // ── Title ──
+      if (settings.showTitle) {
+        doc.setFont('helvetica', 'bold');
+        var titleMaxW = LW - 2 * PAD;
+        var titleFontSize = 18;
+        var titleLines, lineH, textBlockH;
+        // Floor of 7pt so a long title still fits a shrunken band instead of
+        // overflowing into the barcode's quiet zone.
+        while (titleFontSize >= 7) {
+          doc.setFontSize(titleFontSize);
+          titleLines = doc.splitTextToSize(title, titleMaxW);
+          lineH = titleFontSize * 0.45;
+          textBlockH = titleLines.length * lineH;
+          if (textBlockH <= L.titleH - 4) break;
+          titleFontSize -= 1;
+        }
+        // Hard stop: never let the title reach past its band into the barcode's
+        // quiet zone, no matter how long the product name is.
+        titleLines = clampTitleLines(titleLines, lineH, L.titleH);
+        textBlockH = titleLines.length * lineH;
+        var titleStartY = L.titleH / 2 - textBlockH / 2 + lineH * 0.6;
+        titleLines.forEach(function(line, idx) {
+          doc.text(line, PAD, titleStartY + idx * lineH);
+        });
+      }
+
+      // ── Title divider (full width) ──
+      if (settings.showDividers && settings.showTitle) {
+        doc.line(0, L.titleBottom, LW, L.titleBottom);
+      }
+
+      // ── Footer ──
+      if (L.hasFooter) {
+        // Footer divider — only on right side if barcode present
+        if (settings.showDividers) {
+          var fDivX = settings.showBarcode ? L.bcColW : 0;
+          doc.line(fDivX, L.footerTop, LW, L.footerTop);
+        }
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(settings.footerFontSize);
+        var footerRightX = LW - PAD;
+
+        if (settings.showColour && settings.showSizeFooter) {
+          doc.text('COLOUR: ' + color, footerRightX, L.footerTop + 4.5, { align: 'right' });
+          doc.text('SIZE: ' + size, footerRightX, L.footerTop + 8.5, { align: 'right' });
+        } else if (settings.showColour) {
+          doc.text('COLOUR: ' + color, footerRightX, L.footerTop + 7, { align: 'right' });
+        } else if (settings.showSizeFooter) {
+          doc.text('SIZE: ' + size, footerRightX, L.footerTop + 7, { align: 'right' });
+        }
+      }
+
+      // ── Vertical barcode/right divider ──
+      if (settings.showDividers && L.bcColW < LW) {
+        doc.line(L.bcColW, L.bodyTop, L.bcColW, L.footerTop);
+      }
+
+      // ── Size / illustration horizontal divider (right side only) ──
+      if (settings.showDividers && (settings.showSize || settings.showIllustration) && L.bcColW < LW) {
+        doc.line(L.bcColW, L.sizeZoneBottom, LW, L.sizeZoneBottom);
+      }
+
+      // ── Size number ──
+      var sizeCenterX = L.rightX + L.rightW / 2;
+      if (settings.showSize && L.rightW > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(52);
+        doc.text(String(size), sizeCenterX, L.bodyTop + L.sizeZoneH / 2 + 7, { align: 'center' });
+      }
+
+      // ── Illustration ──
+      var illustFile = (row.illustration_file || '').trim();
+      var illustDataUrl = illustrationDataUrls[illustFile]
+        || illustrationDataUrls[illustFile + '.png']
+        || illustrationDataUrls[illustFile + '.jpg']
+        || illustrationDataUrls[illustFile + '.jpeg']
+        || illustrationDataUrls[illustFile.replace(/\.(png|jpg|jpeg|webp)$/i, '')]
+        || null;
+
+      if (settings.showIllustration && illustFile && illustDataUrl && L.rightW > 0) {
+        var illMaxW = L.rightW - 2 * PAD;
+        var illMaxH = (L.footerTop - L.sizeZoneBottom) - 2 * PAD;
+        var illX = L.rightX + PAD;
+        var illY = L.sizeZoneBottom + PAD;
+
+        var tmpImg = new Image();
+        await new Promise(function(resolve) {
+          tmpImg.onload = resolve;
+          tmpImg.src = illustDataUrl;
+        });
+        var imgRatio = tmpImg.width / tmpImg.height;
+        var drawW = illMaxW, drawH = drawW / imgRatio;
+        if (drawH > illMaxH) { drawH = illMaxH; drawW = drawH * imgRatio; }
+        var offsetX = illX + (illMaxW - drawW) / 2;
+        var offsetY = illY + (illMaxH - drawH) / 2;
+        doc.addImage(illustDataUrl, 'PNG', offsetX, offsetY, drawW, drawH, undefined, 'FAST');
+      } else if (settings.showIllustration && illustFile && L.rightW > 0) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.text('[' + illustFile + ']', sizeCenterX, L.sizeZoneBottom + (L.footerTop - L.sizeZoneBottom) / 2, { align: 'center' });
+      }
+
+      // ── Barcode — placed at its true mm size, never stretched ──
+      if (settings.showBarcode) {
+        var geom = calcBarcodeGeom(settings, L, skuFull);
+        var bc = geom ? generateBarcodeDataUrl(skuFull, settings, geom) : null;
+        if (bc) {
+          // Centre the symbol in the space left over on each axis.
+          var bcX = geom.acrossLeft + (geom.acrossAvail - bc.acrossMM) / 2;
+          var bcY = geom.alongTop + (geom.alongAvail - bc.alongMM) / 2;
+          try {
+            // 'FAST' = lossless Flate compression. Without it jsPDF stores the
+            // barcode as a raw bitmap and each label costs ~4.5MB.
+            doc.addImage(bc.url, 'PNG', bcX, bcY, bc.acrossMM, bc.alongMM, undefined, 'FAST');
+          } catch(e) {
+            console.error('Failed to add barcode image:', e);
+          }
+          if (bc.X < SPEC_MIN_X) {
+            underspec.push(skuFull + ' (X=' + bc.X.toFixed(2) + 'mm)');
+          }
+        }
+      }
+
+      progressBar.style.width = ((i + 1) / csvData.length * 100) + '%';
+      await new Promise(function(r) { setTimeout(r, 0); });
+    }
+
+    doc.save('labels.pdf');
+    if (underspec.length) {
+      setStatus('PDF downloaded — ' + csvData.length + ' labels, but ' + underspec.length +
+        ' have bars narrower than the 0.63mm minimum and may not scan reliably: ' +
+        underspec.slice(0, 3).join(', ') + (underspec.length > 3 ? '...' : ''), 'error');
+    } else {
+      setStatus('PDF downloaded — ' + csvData.length + ' labels generated', 'success');
+    }
+
+  } catch (e) {
+    console.error(e);
+    setStatus('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate PDF';
+    setTimeout(function() { progressContainer.style.display = 'none'; }, 2000);
+  }
+}
+
+// ─── MARKETING / PHOTOSHOOT MODE ────────────────────────────
+// Separate from the warehouse code above: it shares the CSV/Sheet loading and
+// jsPDF, but has its own validation, layout and PDF loop.
+
+var currentMode = 'warehouse';
+var mktData = [];          // all valid marketing rows, sorted by PIC
+var mktPreviewIdx = 0;
+var PT_MM = 0.3528;        // 1pt in mm
+var NO_PIC = '(No PIC)';
+
+// Accepted header names, compared after normHeader(): "PIC / Model Name" -> "pic_model_name"
+var MKT_FIELDS = [
+  { key: 'pic',     label: 'PIC',     required: true,
+    aliases: ['pic', 'model', 'model_name', 'pic_model', 'pic_model_name', 'pic_name', 'person_in_charge'] },
+  { key: 'product', label: 'Product', required: true,
+    aliases: ['product', 'product_name', 'product_design', 'shoe', 'shoe_name', 'design', 'shoe_design', 'shoe_product', 'shoe_product_design'] },
+  { key: 'size',    label: 'Size',    required: false, aliases: ['size', 'shoe_size'] },
+  { key: 'colour',  label: 'Colour',  required: false, aliases: ['colour', 'color'] },
+  { key: 'sku',     label: 'SKU / Lifestyle', required: false,
+    aliases: ['sku', 'lifestyle', 'sku_lifestyle', 'lifestyle_sku', 'sku_or_lifestyle'] }
+];
+
+var MKT_SIZES = { '50x30': [50, 30], '40x30': [40, 30], '50x40': [50, 40], '50x50': [50, 50] };
+
+function normHeader(h) {
+  return String(h || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+function selectMode(mode) {
+  currentMode = mode === 'marketing' ? 'marketing' : 'warehouse';
+  var mkt = currentMode === 'marketing';
+  document.getElementById('modeWarehouse').classList.toggle('active', !mkt);
+  document.getElementById('modeMarketing').classList.toggle('active', mkt);
+
+  // Marketing hides everything barcode/illustration related.
+  ['stepIllustrations', 'stepPrompt', 'stepSettings'].forEach(function(id) {
+    document.getElementById(id).style.display = mkt ? 'none' : '';
+  });
+  document.getElementById('stepMarketing').style.display = mkt ? '' : 'none';
+  document.getElementById('mktColumnsHelp').style.display = mkt ? '' : 'none';
+  document.getElementById('subtitle').textContent = mkt
+    ? 'Load your photoshoot sheet, pick who you are printing for, then download a PDF for NiimBlue.'
+    : 'Connect your Google Sheet and upload illustrations to generate print-ready labels.';
+  document.getElementById('generateBtn').textContent = 'Generate PDF';
+
+  renumberSteps();
+
+  // Bookmarkable link: ?mode=marketing opens straight into Marketing mode.
+  try {
+    var url = new URL(window.location.href);
+    if (mkt) url.searchParams.set('mode', 'marketing'); else url.searchParams.delete('mode');
+    history.replaceState(null, '', url.toString());
+  } catch (e) { /* file:// or old browser — not important */ }
+
+  setStatus('');
+  mktPreviewIdx = 0;
+  applyData();     // re-check the loaded sheet for this mode
+  updateBtn();
+  updatePreview();
+}
+
+function renumberSteps() {
+  var n = 1;
+  document.querySelectorAll('.container > .step').forEach(function(step) {
+    if (step.style.display === 'none') return;
+    var num = step.querySelector('.step-number');
+    if (num) num.textContent = n++;
+  });
+}
+
+function loadMarketingData(results, source) {
+  mktData = [];
+  csvData = [];   // warehouse data is not valid in this mode
+  document.getElementById('csvPreview').innerHTML = '';
+
+  if (results.errors.length && !results.data.length) {
+    setSheetStatus('Could not read the file: ' + results.errors[0].message, 'error');
+    refreshMarketingUI([]);
+    return;
+  }
+
+  var headers = results.meta.fields || [];
+  var colFor = {};        // field key -> actual header in the sheet
+  MKT_FIELDS.forEach(function(f) {
+    for (var i = 0; i < headers.length; i++) {
+      if (f.aliases.indexOf(normHeader(headers[i])) !== -1) { colFor[f.key] = headers[i]; break; }
+    }
+  });
+
+  var missingRequired = MKT_FIELDS.filter(function(f) { return f.required && !colFor[f.key]; });
+  if (missingRequired.length) {
+    setSheetStatus('Could not find the ' + missingRequired.map(function(f) { return f.label; }).join(' and ') +
+      ' column. Rename the header in your sheet (e.g. "PIC", "Product") and load again.', 'error');
+    refreshMarketingUI([]);
+    return;
+  }
+  var missingOptional = MKT_FIELDS.filter(function(f) { return !colFor[f.key]; });
+
+  results.data.forEach(function(raw) {
+    var r = {};
+    MKT_FIELDS.forEach(function(f) {
+      r[f.key] = colFor[f.key] ? String(raw[colFor[f.key]] == null ? '' : raw[colFor[f.key]]).trim() : '';
+    });
+    // Skip rows that are completely empty (e.g. blank lines at the bottom of the sheet).
+    if (!MKT_FIELDS.some(function(f) { return r[f.key]; })) return;
+    r.picKey = r.pic ? r.pic.toUpperCase() : NO_PIC;
+    r.missing = MKT_FIELDS.filter(function(f) { return !r[f.key]; }).map(function(f) { return f.label; });
+    mktData.push(r);
+  });
+
+  // Group by PIC (A-Z, rows without a PIC last). Sort is stable, so sheet order is kept inside each PIC.
+  mktData.sort(function(a, b) {
+    if (a.picKey === b.picKey) return 0;
+    if (a.picKey === NO_PIC) return 1;
+    if (b.picKey === NO_PIC) return -1;
+    return a.picKey < b.picKey ? -1 : 1;
+  });
+
+  showCSVPreview(headers, results.data.filter(function(row) {
+    return headers.some(function(h) { return String(row[h] || '').trim(); });
+  }));
+
+  if (!mktData.length) {
+    setSheetStatus('The sheet has the right columns but no rows with data.', 'error');
+  } else {
+    var msg = 'Loaded ' + mktData.length + ' labels from ' + source;
+    if (missingOptional.length) {
+      msg += '. No ' + missingOptional.map(function(f) { return f.label; }).join(', ') +
+        ' column found, so it will print as "-".';
+      setSheetStatus(msg, 'error');
+    } else {
+      setSheetStatus(msg, 'success');
+    }
+  }
+  refreshMarketingUI(missingOptional);
+}
+
+// Rebuild the PIC dropdown, count and warnings after loading data.
+function refreshMarketingUI(missingCols) {
+  var sel = document.getElementById('mktPicSelect');
+  var prev = sel.value;
+  var counts = {};
+  mktData.forEach(function(r) { counts[r.picKey] = (counts[r.picKey] || 0) + 1; });
+  var pics = Object.keys(counts).sort(function(a, b) {
+    if (a === NO_PIC) return 1;
+    if (b === NO_PIC) return -1;
+    return a < b ? -1 : 1;
+  });
+
+  sel.innerHTML = '';
+  if (!mktData.length) {
+    sel.appendChild(new Option('Load your sheet first', '__ALL__'));
+  } else {
+    sel.appendChild(new Option('Everyone (' + mktData.length + ' labels)', '__ALL__'));
+    pics.forEach(function(p) {
+      sel.appendChild(new Option(p + ' (' + counts[p] + (counts[p] === 1 ? ' label)' : ' labels)'), p));
+    });
+  }
+  sel.value = (prev && (prev === '__ALL__' || counts[prev])) ? prev : '__ALL__';
+  mktPreviewIdx = 0;
+  mktMissingCols = missingCols || [];
+  updateBtn();
+  updatePreview();
+}
+var mktMissingCols = [];
+
+function getMktSelection() {
+  var v = document.getElementById('mktPicSelect').value;
+  if (!v || v === '__ALL__') return mktData;
+  return mktData.filter(function(r) { return r.picKey === v; });
+}
+
+function renderMktCountAndWarnings(rows) {
+  var countEl = document.getElementById('mktCount');
+  var warnEl = document.getElementById('mktWarnings');
+  countEl.innerHTML = '';
+  warnEl.innerHTML = '';
+  if (!mktData.length) return;
+
+  var sel = document.getElementById('mktPicSelect').value;
+  var strong = document.createElement('strong');
+  strong.textContent = rows.length + (rows.length === 1 ? ' label' : ' labels');
+  countEl.appendChild(strong);
+  countEl.appendChild(document.createTextNode(
+    sel === '__ALL__' ? ' will print, grouped by PIC.' : ' will print for ' + sel + '.'));
+
+  // Only warn about rows in the current selection. Whole missing columns are
+  // already reported in the load status, so list per-row gaps only for columns that exist.
+  var problems = rows.filter(function(r) {
+    return r.missing.some(function(m) { return mktMissingCols.map(function(f) { return f.label; }).indexOf(m) === -1; });
+  });
+  if (!problems.length) return;
+
+  var box = document.createElement('div');
+  box.className = 'warn-box';
+  var head = document.createElement('strong');
+  head.textContent = problems.length + (problems.length === 1 ? ' label is' : ' labels are') +
+    ' missing information (it will print as "-"). Fix the sheet and load again:';
+  box.appendChild(head);
+  var ul = document.createElement('ul');
+  problems.slice(0, 10).forEach(function(r) {
+    var li = document.createElement('li');
+    var who = (r.pic || NO_PIC) + ' - ' + (r.product || '(no product)') + (r.size ? ', size ' + r.size : '');
+    var gaps = r.missing.filter(function(m) {
+      return mktMissingCols.map(function(f) { return f.label; }).indexOf(m) === -1;
+    });
+    li.textContent = who + ': missing ' + gaps.join(', ');
+    ul.appendChild(li);
+  });
+  if (problems.length > 10) {
+    var more = document.createElement('li');
+    more.textContent = '...and ' + (problems.length - 10) + ' more';
+    ul.appendChild(more);
+  }
+  box.appendChild(ul);
+  warnEl.appendChild(box);
+}
+
+// Shrink text until it fits maxW; if it still doesn't fit at minPt, cut it with "...".
+function fitText(text, maxW, maxPt, minPt, bold, measure) {
+  for (var pt = maxPt; pt >= minPt; pt -= 0.5) {
+    if (measure(text, pt, bold) <= maxW) return { text: text, pt: pt };
+  }
+  var t = text;
+  while (t.length > 1 && measure(t + '...', minPt, bold) > maxW) t = t.slice(0, -1);
+  return { text: t.trim() + '...', pt: minPt };
+}
+
+// ONE layout used by both the preview and the PDF, so they match.
+// measure(text, pt, bold) returns the text width in mm.
+// Returns { divider: y, items: [{ text, x, y, pt, bold, align }] } — y is the vertical centre.
+// Split a name into two lines at the space/hyphen that gives the most even halves.
+function splitTwoLines(text, measure, pt) {
+  var best = null;
+  for (var i = 1; i < text.length; i++) {
+    var a, b;
+    if (text[i] === ' ') { a = text.slice(0, i); b = text.slice(i + 1); }
+    else if (text[i - 1] === '-') { a = text.slice(0, i); b = text.slice(i); }
+    else continue;
+    var w = Math.max(measure(a, pt, true), measure(b, pt, true));
+    if (!best || w < best.w) best = { lines: [a.trim(), b.trim()], w: w };
+  }
+  return best ? best.lines : null;
+}
+
+// PIC gets the biggest text. Long names wrap to 2 lines instead of shrinking to nothing.
+function fitPic(text, maxW, bandH, measure) {
+  var CAP = 0.72;                                    // capital letter height, in em
+  var maxPt1 = Math.min(40, (bandH - 3) / PT_MM / CAP);
+  var one = fitText(text, maxW, maxPt1, 9, true, measure);
+  if (one.pt >= 16) return { lines: [one.text], pt: one.pt };
+
+  var lines = splitTwoLines(text, measure, 12);
+  if (!lines) return { lines: [one.text], pt: one.pt };
+  var maxPt2 = Math.min(40, (bandH - 3) / 2 / PT_MM / 0.95);
+  for (var pt = maxPt2; pt >= 9; pt -= 0.5) {
+    if (measure(lines[0], pt, true) <= maxW && measure(lines[1], pt, true) <= maxW) {
+      return pt > one.pt ? { lines: lines, pt: pt } : { lines: [one.text], pt: one.pt };
+    }
+  }
+  return { lines: [one.text], pt: one.pt };
+}
+
+function mktLayout(r, W, H, measure) {
+  var PAD = 2.5;                                     // keep text off the edge; thermal printers can clip
+  var maxW = W - 2 * PAD;
+  var items = [];
+
+  // PIC band: top ~38% of the label, biggest text.
+  var picH = H * 0.38;
+  var pic = fitPic(r.pic ? r.pic.toUpperCase() : NO_PIC.toUpperCase(), maxW, picH, measure);
+  var lineGap = pic.pt * PT_MM * 0.95;
+  var firstY = picH / 2 - (pic.lines.length - 1) * lineGap / 2;
+  pic.lines.forEach(function(t, i) {
+    items.push({ text: t, x: W / 2, y: firstY + i * lineGap, pt: pic.pt, bold: true, align: 'center' });
+  });
+
+  // Details below the divider: product (a bit bigger) + 3 lines.
+  var top = picH + 1.2, bottom = H - PAD * 0.8;
+  var unit = (bottom - top) / 4.3;               // product line = 1.3 units, others 1 unit
+  var productPt = Math.min(14, unit * 1.3 / PT_MM / 1.2);
+  var detailPt = Math.min(11, unit / PT_MM / 1.25);
+
+  var prod = fitText(r.product || '-', maxW, productPt, 6, true, measure);
+  var y = top + unit * 1.3 / 2;
+  items.push({ text: prod.text, x: PAD, y: y, pt: prod.pt, bold: true, align: 'left' });
+  y += unit * 1.3 / 2;
+
+  [['Size: ', r.size], ['Colour: ', r.colour], ['SKU/Lifestyle: ', r.sku]].forEach(function(line) {
+    var f = fitText(line[0] + (line[1] || '-'), maxW, detailPt, 5.5, false, measure);
+    items.push({ text: f.text, x: PAD, y: y + unit / 2, pt: f.pt, bold: false, align: 'left' });
+    y += unit;
+  });
+
+  return { divider: picH, items: items };
+}
+
+// Items store the visual centre of the capital letters. Browser canvas and jsPDF
+// disagree on what "middle" means, so both renderers draw on the normal baseline,
+// half a cap-height (0.72em) below the centre.
+function baselineY(it) { return it.y + it.pt * PT_MM * 0.36; }
+
+function getMktLabelSize() {
+  return MKT_SIZES[document.getElementById('mktSizeSelect').value] || MKT_SIZES['50x30'];
+}
+
+function drawMarketingPreview() {
+  var rows = getMktSelection();
+  renderMktCountAndWarnings(rows);
+
+  var size = getMktLabelSize(), W = size[0], H = size[1];
+  var canvas = document.getElementById('mktPreviewCanvas');
+  var cssW = 300, sc = cssW / W;                    // preview px per mm
+  var dpr = window.devicePixelRatio || 1;
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = (H * sc) + 'px';
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(H * sc * dpr);
+  var ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr * sc, 0, 0, dpr * sc, 0, 0);  // draw in mm from here on
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W, H);
+
+  var n = rows.length;
+  if (mktPreviewIdx >= n) mktPreviewIdx = n - 1;
+  if (mktPreviewIdx < 0) mktPreviewIdx = 0;
+  document.getElementById('mktPrev').disabled = mktPreviewIdx <= 0;
+  document.getElementById('mktNext').disabled = mktPreviewIdx >= n - 1;
+  document.getElementById('mktPreviewPos').textContent = n ? 'Label ' + (mktPreviewIdx + 1) + ' of ' + n : 'Sample label';
+
+  var r = n ? rows[mktPreviewIdx]
+            : { pic: 'Jared', product: 'Heaven Heels', size: '39', colour: 'Espresso', sku: 'XXXXX' };
+
+  function font(pt, bold) { return (bold ? 'bold ' : '') + (pt * PT_MM) + 'px Helvetica, Arial, sans-serif'; }
+  var L = mktLayout(r, W, H, function(t, pt, bold) { ctx.font = font(pt, bold); return ctx.measureText(t).width; });
+
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 0.3;
+  ctx.beginPath(); ctx.moveTo(2.5, L.divider); ctx.lineTo(W - 2.5, L.divider); ctx.stroke();
+
+  ctx.fillStyle = '#000';
+  ctx.textBaseline = 'alphabetic';
+  L.items.forEach(function(it) {
+    ctx.font = font(it.pt, it.bold);
+    ctx.textAlign = it.align;
+    ctx.fillText(it.text, it.x, baselineY(it));
+  });
+  ctx.textAlign = 'left';
+}
+
+async function generateMarketingLabels() {
+  var btn = document.getElementById('generateBtn');
+  var progressContainer = document.getElementById('progressContainer');
+  var progressBar = document.getElementById('progressBar');
+  var rows = getMktSelection();
+  if (!rows.length) { setStatus('Nothing to print. Load a sheet first.', 'error'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  progressContainer.style.display = 'block';
+  progressBar.style.width = '0%';
+  setStatus('');
+
+  try {
+    var size = getMktLabelSize(), W = size[0], H = size[1];
+    // jsPDF swaps [w,h] to portrait unless told otherwise — set it explicitly.
+    var orient = W > H ? 'landscape' : 'portrait';
+    var doc = new jsPDF({ unit: 'mm', format: [W, H], orientation: orient });
+    var measure = function(t, pt, bold) {
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.setFontSize(pt);
+      return doc.getTextWidth(t);
+    };
+
+    for (var i = 0; i < rows.length; i++) {
+      if (i > 0) doc.addPage([W, H], orient);
+      var L = mktLayout(rows[i], W, H, measure);
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.3);
+      doc.line(2.5, L.divider, W - 2.5, L.divider);
+      L.items.forEach(function(it) {
+        doc.setFont('helvetica', it.bold ? 'bold' : 'normal');
+        doc.setFontSize(it.pt);
+        doc.text(it.text, it.x, baselineY(it), { align: it.align });
+      });
+      progressBar.style.width = ((i + 1) / rows.length * 100) + '%';
+      if (i % 20 === 19) await new Promise(function(r) { setTimeout(r, 0); });
+    }
+
+    var sel = document.getElementById('mktPicSelect').value;
+    var who = sel === '__ALL__' ? 'ALL' : sel.replace(/[^A-Za-z0-9_-]+/g, '_');
+    doc.save('photoshoot-labels-' + who + '.pdf');
+
+    var incomplete = rows.filter(function(r) { return r.missing.length; }).length;
+    if (incomplete) {
+      setStatus('PDF downloaded: ' + rows.length + ' labels. ' + incomplete +
+        ' have missing information (shown as "-"). See the list above.', 'error');
+    } else {
+      setStatus('PDF downloaded: ' + rows.length + ' labels.', 'success');
+    }
+  } catch (e) {
+    console.error(e);
+    setStatus('Error: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Generate PDF';
+    updateBtn();
+    setTimeout(function() { progressContainer.style.display = 'none'; }, 2000);
+  }
+}
+
+// ─── START ──────────────────────────────────────────────────
+// Open in Marketing mode when the link has ?mode=marketing
+(function() {
+  var mode = 'warehouse';
+  try { mode = new URLSearchParams(window.location.search).get('mode') || 'warehouse'; } catch (e) {}
+  if (mode === 'marketing') selectMode('marketing');
+  else { renumberSteps(); updatePreview(); }
+})();
+</script>
+</body>
+</html>
