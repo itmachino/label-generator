@@ -217,8 +217,12 @@
     <p class="help-text" id="mktColumnsHelp" style="display:none">
       Your sheet needs these columns (names can vary a little):
       <strong>PIC</strong> (or Model Name), <strong>Product</strong> (or Shoe / Design),
-      <strong>Size</strong>, <strong>Colour</strong>, <strong>SKU</strong> (or Lifestyle).
+      <strong>Size</strong>, <strong>Colour</strong>, <strong>SKU</strong> (or Lifestyle),
+      and optionally <strong>Brand</strong>.
     </p>
+    <div id="mktTemplateRow" style="display:none; margin-top:8px;">
+      <button type="button" class="btn-sm" onclick="downloadMktTemplate()">Download blank CSV template</button>
+    </div>
     <div id="csvPreview"></div>
     <div id="sheetStatus" class="status"></div>
   </div>
@@ -237,7 +241,7 @@
     </div>
     <div class="mkt-row">
       <label for="mktSizeSelect">Label size (NiimBlue)</label>
-      <select id="mktSizeSelect" onchange="updatePreview()">
+      <select id="mktSizeSelect" onchange="onMktSettingsChange()">
         <option value="50x30" selected>50 x 30mm</option>
         <option value="40x30">40 x 30mm</option>
         <option value="50x40">50 x 40mm</option>
@@ -254,7 +258,64 @@
         <span id="mktPreviewPos">-</span>
         <button type="button" id="mktNext" onclick="mktPreviewIdx++; updatePreview();">Next &#9654;</button>
       </div>
+      <button type="button" class="btn-sm" id="mktSingleBtn" style="margin-top:10px;" onclick="printSingleMarketingLabel()">Download just this label</button>
     </div>
+  </div>
+
+  <!-- Marketing label settings (Marketing mode only) -->
+  <div class="step" id="stepMarketingSettings" style="display:none">
+    <div class="step-header">
+      <div class="step-number">4</div>
+      <div class="step-title">Label settings</div>
+    </div>
+    <div class="settings-section" style="padding-top:0; border-top:none; margin-top:0;">
+      <div class="settings-section-title">Fields on the label</div>
+      <div class="setting-item">
+        <label for="mktShowPic">PIC name (top bar)</label>
+        <input type="checkbox" id="mktShowPic" checked onchange="onMktSettingsChange()">
+      </div>
+      <div class="slider-row">
+        <label>PIC name (top bar) text size <span class="slider-value" id="mktPicFontVal">14pt</span></label>
+        <input type="range" id="mktPicFontSlider" min="6" max="20" value="14" oninput="document.getElementById('mktPicFontVal').textContent=this.value+'pt'; onMktSettingsChange()">
+      </div>
+      <div class="setting-item">
+        <label for="mktShowBrand">Brand</label>
+        <input type="checkbox" id="mktShowBrand" checked onchange="onMktSettingsChange()">
+      </div>
+      <div class="slider-row">
+        <label>Brand text size <span class="slider-value" id="mktBrandFontVal">9pt</span></label>
+        <input type="range" id="mktBrandFontSlider" min="6" max="18" value="9" oninput="document.getElementById('mktBrandFontVal').textContent=this.value+'pt'; onMktSettingsChange()">
+      </div>
+      <div class="setting-item">
+        <label for="mktShowProduct">Shoe name + size</label>
+        <input type="checkbox" id="mktShowProduct" checked onchange="onMktSettingsChange()">
+      </div>
+      <div class="slider-row">
+        <label>Shoe name + size text size <span class="slider-value" id="mktProductFontVal">13pt</span></label>
+        <input type="range" id="mktProductFontSlider" min="6" max="20" value="13" oninput="document.getElementById('mktProductFontVal').textContent=this.value+'pt'; onMktSettingsChange()">
+      </div>
+      <div class="setting-item">
+        <label for="mktProductBold">Bold shoe name</label>
+        <input type="checkbox" id="mktProductBold" checked onchange="onMktSettingsChange()">
+      </div>
+      <div class="setting-item">
+        <label for="mktShowColour">Colour</label>
+        <input type="checkbox" id="mktShowColour" checked onchange="onMktSettingsChange()">
+      </div>
+      <div class="slider-row">
+        <label>Colour text size <span class="slider-value" id="mktColourFontVal">9pt</span></label>
+        <input type="range" id="mktColourFontSlider" min="6" max="16" value="9" oninput="document.getElementById('mktColourFontVal').textContent=this.value+'pt'; onMktSettingsChange()">
+      </div>
+      <div class="setting-item">
+        <label for="mktShowSku">SKU / Lifestyle</label>
+        <input type="checkbox" id="mktShowSku" checked onchange="onMktSettingsChange()">
+      </div>
+      <div class="slider-row">
+        <label>SKU / Lifestyle text size <span class="slider-value" id="mktSkuFontVal">9pt</span></label>
+        <input type="range" id="mktSkuFontSlider" min="6" max="16" value="9" oninput="document.getElementById('mktSkuFontVal').textContent=this.value+'pt'; onMktSettingsChange()">
+      </div>
+    </div>
+    <p class="help-text">Sizes are for a 50 x 30mm label and scale with the label size. Text still shrinks automatically if it is too long. Your choices are remembered on this computer.</p>
   </div>
 
   <!-- Step 2: Illustrations -->
@@ -1381,7 +1442,8 @@ var MKT_FIELDS = [
   { key: 'size',    label: 'Size',    required: false, aliases: ['size', 'shoe_size'] },
   { key: 'colour',  label: 'Colour',  required: false, aliases: ['colour', 'color'] },
   { key: 'sku',     label: 'SKU / Lifestyle', required: false,
-    aliases: ['sku', 'lifestyle', 'sku_lifestyle', 'lifestyle_sku', 'sku_or_lifestyle'] }
+    aliases: ['sku', 'lifestyle', 'sku_lifestyle', 'lifestyle_sku', 'sku_or_lifestyle'] },
+  { key: 'brand',   label: 'Brand',   required: false, aliases: ['brand', 'label', 'brand_label', 'brand_name'] }
 ];
 
 var MKT_SIZES = { '50x30': [50, 30], '40x30': [40, 30], '50x40': [50, 40], '50x50': [50, 50] };
@@ -1401,6 +1463,8 @@ function selectMode(mode) {
     document.getElementById(id).style.display = mkt ? 'none' : '';
   });
   document.getElementById('stepMarketing').style.display = mkt ? '' : 'none';
+  document.getElementById('stepMarketingSettings').style.display = mkt ? '' : 'none';
+  document.getElementById('mktTemplateRow').style.display = mkt ? '' : 'none';
   document.getElementById('mktColumnsHelp').style.display = mkt ? '' : 'none';
   document.getElementById('subtitle').textContent = mkt
     ? 'Load your photoshoot sheet, pick who you are printing for, then download a PDF for NiimBlue.'
@@ -1599,14 +1663,15 @@ var MKT_SIZE_PREFIX = ' - ';
 //Hlello
 // Shoe line: "<Shoe name> MAC <size>". If it is too long, only the SHOE NAME is
 // shortened with "..." — "MAC 40" is never cut off.
-function fitShoeLine(name, size, maxW, maxPt, minPt, measure) {
+function fitShoeLine(name, size, maxW, maxPt, minPt, measure, bold) {
+  bold = bold !== false;
   var tail = ' ' + MKT_SIZE_PREFIX + (size ? ' ' + size : '');
   var full = (name || '-') + tail;
   for (var pt = maxPt; pt >= minPt; pt -= 0.5) {
-    if (measure(full, pt, true) <= maxW) return { text: full, pt: pt };
+    if (measure(full, pt, bold) <= maxW) return { text: full, pt: pt };
   }
   var n = name || '-';
-  while (n.length > 1 && measure(n.trim() + '...' + tail, minPt, true) > maxW) n = n.slice(0, -1);
+  while (n.length > 1 && measure(n.trim() + '...' + tail, minPt, bold) > maxW) n = n.slice(0, -1);
   return { text: n.trim() + '...' + tail, pt: minPt };
 }
 
@@ -1617,27 +1682,103 @@ function fitShoeLine(name, size, maxW, maxPt, minPt, measure) {
 //   LS-MJ-040               <- smaller
 // Every line sits at a FIXED position with a FIXED size, so all labels match.
 // Text only shrinks when a value is too long. Designed on 50x30mm; other sizes scale.
-function mktLayout(r, W, H, measure) {
+function mktLayout(r, W, H, measure, st) {
   var PAD = 2.5;                                  // keep text off the edge; thermal printers can clip
   var maxW = W - 2 * PAD;
   var k = Math.min(W / 50, H / 30);               // text scale
-  var ky = Math.min(H / 30, 1);                   // line positions: same on 30mm-tall labels; taller labels keep spare space at the bottom
+  var ky = Math.min(H / 30, 1);                   // line spacing: same on 30mm-tall labels
   var items = [];
 
-  var bandH = 8.5 * k;
-  var pic = fitText(r.pic ? r.pic.toUpperCase() : NO_PIC.toUpperCase(), maxW, 14 * k, 8 * k, true, measure);
-  items.push({ text: pic.text, x: PAD, y: bandH / 2, pt: pic.pt, bold: true, align: 'left', color: 'white' });
+  function minOf(pt) { return Math.max(6 * k, pt * 0.58); }
 
-  var shoe = fitShoeLine(r.product, r.size, maxW, 13 * k, 8 * k, measure);
-  items.push({ text: shoe.text, x: PAD, y: 13.8 * ky, pt: shoe.pt, bold: true, align: 'left' });
+  var bandH = st.showPic ? 8.5 * k : 0;
+  if (st.showPic) {
+    var picMax = st.picFontSize * k;
+    var pic = fitText(r.pic ? r.pic.toUpperCase() : NO_PIC.toUpperCase(), maxW, picMax, minOf(picMax), true, measure);
+    items.push({ text: pic.text, x: PAD, y: bandH / 2, pt: pic.pt, bold: true, align: 'left', color: 'white' });
+  }
 
-  var colour = fitText(r.colour || '-', maxW, 9 * k, 6.5 * k, false, measure);
-  items.push({ text: colour.text, x: PAD, y: 19.8 * ky, pt: colour.pt, bold: false, align: 'left' });
+  // Lines that are switched on, top to bottom. They reflow to fill the label.
+  var lines = [];
+  if (st.showBrand) lines.push('brand');
+  if (st.showProduct) lines.push('product');
+  if (st.showColour) lines.push('colour');
+  if (st.showSku) lines.push('sku');
 
-  var sku = fitText(r.sku || '-', maxW, 9 * k, 6.5 * k, false, measure);
-  items.push({ text: sku.text, x: PAD, y: 24.4 * ky, pt: sku.pt, bold: false, align: 'left' });
+  var top = bandH + (st.showPic ? 5.3 : 4) * ky;
+  var bottom = H - 3.5 * ky;
+  var gap = lines.length > 1 ? (bottom - top) / (lines.length - 1) : 0;
+  gap = Math.max(4 * ky, Math.min(gap, 6 * ky));
 
-  return { band: { x: 0, y: 0, w: W, h: bandH }, items: items };
+  lines.forEach(function(kind, i) {
+    var y = top + i * gap, fit;
+    if (kind === 'product') {
+      var pm = st.productFontSize * k;
+      fit = fitShoeLine(r.product, r.size, maxW, pm, minOf(pm), measure, st.productBold);
+      items.push({ text: fit.text, x: PAD, y: y, pt: fit.pt, bold: !!st.productBold, align: 'left' });
+    } else {
+      var mx = st[kind + 'FontSize'] * k;
+      fit = fitText(r[kind] || '-', maxW, mx, minOf(mx), false, measure);
+      items.push({ text: fit.text, x: PAD, y: y, pt: fit.pt, bold: false, align: 'left' });
+    }
+  });
+
+  return { band: st.showPic ? { x: 0, y: 0, w: W, h: bandH } : null, items: items };
+}
+
+// ─── MARKETING SETTINGS (persisted in localStorage) ─────────
+
+var MKT_SETTINGS_KEY = 'labelGen.mktSettings.v1';
+var MKT_CTRLS = [['Pic', 'pic'], ['Brand', 'brand'], ['Product', 'product'], ['Colour', 'colour'], ['Sku', 'sku']];
+
+function getMktSettings() {
+  var st = {
+    productBold: document.getElementById('mktProductBold').checked,
+    tapeSize: document.getElementById('mktSizeSelect').value
+  };
+  MKT_CTRLS.forEach(function(c) {
+    st['show' + c[0]] = document.getElementById('mktShow' + c[0]).checked;
+    st[c[1] + 'FontSize'] = parseFloat(document.getElementById('mkt' + c[0] + 'FontSlider').value);
+  });
+  return st;
+}
+
+function saveMktSettings() {
+  try { localStorage.setItem(MKT_SETTINGS_KEY, JSON.stringify(getMktSettings())); } catch (e) {}
+}
+
+function loadMktSettings() {
+  var st = null;
+  try { st = JSON.parse(localStorage.getItem(MKT_SETTINGS_KEY) || 'null'); } catch (e) {}
+  if (!st) return;
+  MKT_CTRLS.forEach(function(c) {
+    if (typeof st['show' + c[0]] === 'boolean') document.getElementById('mktShow' + c[0]).checked = st['show' + c[0]];
+    var v = st[c[1] + 'FontSize'];
+    if (typeof v === 'number' && isFinite(v)) {
+      var slider = document.getElementById('mkt' + c[0] + 'FontSlider');
+      slider.value = v;
+      document.getElementById('mkt' + c[0] + 'FontVal').textContent = slider.value + 'pt';
+    }
+  });
+  if (typeof st.productBold === 'boolean') document.getElementById('mktProductBold').checked = st.productBold;
+  if (st.tapeSize && MKT_SIZES[st.tapeSize]) document.getElementById('mktSizeSelect').value = st.tapeSize;
+}
+
+function onMktSettingsChange() { saveMktSettings(); updatePreview(); }
+
+function downloadMktTemplate() {
+  var headers = MKT_FIELDS.map(function(f) { return f.label; });
+  var example = { pic: 'Jared', product: 'Heaven Heels', size: '39', colour: 'Espresso', sku: 'LS-HH-039', brand: 'Brand name' };
+  var csv = Papa.unparse([headers, MKT_FIELDS.map(function(f) { return example[f.key]; })]);
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'photoshoot-labels-template.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
 }
 
 // Items store the visual centre of the capital letters. Browser canvas and jsPDF
@@ -1671,16 +1812,19 @@ function drawMarketingPreview() {
   if (mktPreviewIdx < 0) mktPreviewIdx = 0;
   document.getElementById('mktPrev').disabled = mktPreviewIdx <= 0;
   document.getElementById('mktNext').disabled = mktPreviewIdx >= n - 1;
+  document.getElementById('mktSingleBtn').disabled = !n;
   document.getElementById('mktPreviewPos').textContent = n ? 'Label ' + (mktPreviewIdx + 1) + ' of ' + n : 'Sample label';
 
   var r = n ? rows[mktPreviewIdx]
-            : { pic: 'Jared', product: 'Heaven Heels', size: '39', colour: 'Espresso', sku: 'XXXXX' };
+            : { pic: 'Jared', product: 'Heaven Heels', size: '39', colour: 'Espresso', sku: 'XXXXX', brand: 'Brand' };
 
   function font(pt, bold) { return (bold ? 'bold ' : '') + (pt * PT_MM) + 'px Helvetica, Arial, sans-serif'; }
-  var L = mktLayout(r, W, H, function(t, pt, bold) { ctx.font = font(pt, bold); return ctx.measureText(t).width; });
+  var L = mktLayout(r, W, H, function(t, pt, bold) { ctx.font = font(pt, bold); return ctx.measureText(t).width; }, getMktSettings());
 
-  ctx.fillStyle = '#000';
-  ctx.fillRect(L.band.x, L.band.y, L.band.w, L.band.h);
+  if (L.band) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(L.band.x, L.band.y, L.band.w, L.band.h);
+  }
 
   ctx.textBaseline = 'alphabetic';
   L.items.forEach(function(it) {
@@ -1690,6 +1834,38 @@ function drawMarketingPreview() {
     ctx.fillText(it.text, it.x, baselineY(it));
   });
   ctx.textAlign = 'left';
+}
+
+// Build one PDF page per row. onProgress(done, total) is optional.
+async function buildMarketingPdf(rows, onProgress) {
+  var st = getMktSettings();
+  var size = getMktLabelSize(), W = size[0], H = size[1];
+  // jsPDF swaps [w,h] to portrait unless told otherwise — set it explicitly.
+  var orient = W > H ? 'landscape' : 'portrait';
+  var doc = new jsPDF({ unit: 'mm', format: [W, H], orientation: orient });
+  var measure = function(t, pt, bold) {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(pt);
+    return doc.getTextWidth(t);
+  };
+
+  for (var i = 0; i < rows.length; i++) {
+    if (i > 0) doc.addPage([W, H], orient);
+    var L = mktLayout(rows[i], W, H, measure, st);
+    if (L.band) {
+      doc.setFillColor(0, 0, 0);
+      doc.rect(L.band.x, L.band.y, L.band.w, L.band.h, 'F');
+    }
+    L.items.forEach(function(it) {
+      doc.setFont('helvetica', it.bold ? 'bold' : 'normal');
+      doc.setFontSize(it.pt);
+      if (it.color === 'white') doc.setTextColor(255, 255, 255); else doc.setTextColor(0, 0, 0);
+      doc.text(it.text, it.x, baselineY(it), { align: it.align });
+    });
+    if (onProgress) onProgress(i + 1, rows.length);
+    if (i % 20 === 19) await new Promise(function(r) { setTimeout(r, 0); });
+  }
+  return doc;
 }
 
 async function generateMarketingLabels() {
@@ -1706,30 +1882,9 @@ async function generateMarketingLabels() {
   setStatus('');
 
   try {
-    var size = getMktLabelSize(), W = size[0], H = size[1];
-    // jsPDF swaps [w,h] to portrait unless told otherwise — set it explicitly.
-    var orient = W > H ? 'landscape' : 'portrait';
-    var doc = new jsPDF({ unit: 'mm', format: [W, H], orientation: orient });
-    var measure = function(t, pt, bold) {
-      doc.setFont('helvetica', bold ? 'bold' : 'normal');
-      doc.setFontSize(pt);
-      return doc.getTextWidth(t);
-    };
-
-    for (var i = 0; i < rows.length; i++) {
-      if (i > 0) doc.addPage([W, H], orient);
-      var L = mktLayout(rows[i], W, H, measure);
-      doc.setFillColor(0, 0, 0);
-      doc.rect(L.band.x, L.band.y, L.band.w, L.band.h, 'F');
-      L.items.forEach(function(it) {
-        doc.setFont('helvetica', it.bold ? 'bold' : 'normal');
-        doc.setFontSize(it.pt);
-        if (it.color === 'white') doc.setTextColor(255, 255, 255); else doc.setTextColor(0, 0, 0);
-        doc.text(it.text, it.x, baselineY(it), { align: it.align });
-      });
-      progressBar.style.width = ((i + 1) / rows.length * 100) + '%';
-      if (i % 20 === 19) await new Promise(function(r) { setTimeout(r, 0); });
-    }
+    var doc = await buildMarketingPdf(rows, function(done, total) {
+      progressBar.style.width = (done / total * 100) + '%';
+    });
 
     var sel = document.getElementById('mktPicSelect').value;
     var who = sel === '__ALL__' ? 'ALL' : sel.replace(/[^A-Za-z0-9_-]+/g, '_');
@@ -1752,9 +1907,27 @@ async function generateMarketingLabels() {
   }
 }
 
+// Reprint: PDF of only the label currently shown in the preview.
+async function printSingleMarketingLabel() {
+  var rows = getMktSelection();
+  if (!rows.length) { setStatus('Nothing to print. Load a sheet first.', 'error'); return; }
+  var row = rows[Math.max(0, Math.min(mktPreviewIdx, rows.length - 1))];
+  try {
+    var doc = await buildMarketingPdf([row]);
+    var name = ((row.pic || 'NO_PIC') + '_' + (row.product || 'label') + (row.size ? '_' + row.size : ''))
+      .replace(/[^A-Za-z0-9_-]+/g, '_');
+    doc.save('photoshoot-label-' + name + '.pdf');
+    setStatus('PDF downloaded: 1 label (' + (row.product || 'no product') + (row.size ? ', size ' + row.size : '') + ').', 'success');
+  } catch (e) {
+    console.error(e);
+    setStatus('Error: ' + e.message, 'error');
+  }
+}
+
 // ─── START ──────────────────────────────────────────────────
 // Open in Marketing mode when the link has ?mode=marketing
 (function() {
+  loadMktSettings();
   var mode = 'warehouse';
   try { mode = new URLSearchParams(window.location.search).get('mode') || 'warehouse'; } catch (e) {}
   if (mode === 'marketing') selectMode('marketing');
